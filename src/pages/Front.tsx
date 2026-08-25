@@ -18,7 +18,6 @@ export default function Front() {
           <TabsTrigger value="hero">Hero</TabsTrigger>
           <TabsTrigger value="about">Sobre nosotros</TabsTrigger>
           <TabsTrigger value="cards">Tarjetas</TabsTrigger>
-          <TabsTrigger value="compare">Antes/Después</TabsTrigger>
           <TabsTrigger value="testimonials">Testimonios</TabsTrigger>
           <TabsTrigger value="footer">Footer</TabsTrigger>
         </TabsList>
@@ -33,9 +32,6 @@ export default function Front() {
         </TabsContent>
         <TabsContent value="cards">
           <SiteContentPanel section="cards" />
-        </TabsContent>
-        <TabsContent value="compare">
-          <SiteContentPanel section="compare" />
         </TabsContent>
         <TabsContent value="testimonials">
           <TestimonialsPanel />

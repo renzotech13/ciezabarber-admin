@@ -1,6 +1,6 @@
--- Bot de WhatsApp — Fase 2: clientes, horario comercial, bloqueos, citas
--- (con protección real contra doble-reserva vía EXCLUDE constraint),
--- conversaciones y mensajes.
+-- Bot de WhatsApp: clientes, horario comercial, bloqueos, citas (con
+-- protección real contra doble-reserva vía EXCLUDE constraint),
+-- conversaciones, mensajes y tope de gasto diario.
 
 create extension if not exists btree_gist;
 
@@ -77,10 +77,6 @@ create table mensajes (
 );
 create index mensajes_conversacion_idx on mensajes (conversacion_id, created_at);
 
--- RLS: estas tablas son solo para el backend del bot (usa la service role
--- key, que ignora RLS por diseño de Supabase). Se habilita RLS sin
--- políticas para anon — deny-all — y solo lectura para authenticated
--- (panel admin futuro), sin escritura todavía.
 alter table clientes enable row level security;
 alter table business_hours enable row level security;
 alter table bloqueos enable row level security;
@@ -94,3 +90,28 @@ create policy "Authenticated can view bloqueos" on bloqueos for select to authen
 create policy "Authenticated can view citas" on citas for select to authenticated using (true);
 create policy "Authenticated can view conversaciones" on conversaciones for select to authenticated using (true);
 create policy "Authenticated can view mensajes" on mensajes for select to authenticated using (true);
+
+create schema if not exists extensions;
+alter extension btree_gist set schema extensions;
+
+create table bot_daily_usage (
+  usage_date date primary key,
+  tokens_used bigint not null default 0
+);
+alter table bot_daily_usage enable row level security;
+
+create or replace function increment_bot_daily_usage(p_usage_date date, p_tokens bigint)
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  insert into public.bot_daily_usage (usage_date, tokens_used)
+  values (p_usage_date, p_tokens)
+  on conflict (usage_date)
+  do update set tokens_used = public.bot_daily_usage.tokens_used + excluded.tokens_used;
+$$;
+
+revoke execute on function public.increment_bot_daily_usage(date, bigint) from public;
+revoke execute on function public.increment_bot_daily_usage(date, bigint) from anon;
+revoke execute on function public.increment_bot_daily_usage(date, bigint) from authenticated;

@@ -36,7 +36,7 @@ const EMPTY: FormState = {
 export default function SiteContentPanel({
   section,
 }: {
-  section: "logo" | "hero" | "about" | "cards" | "compare" | "footer"
+  section: "logo" | "hero" | "about" | "cards" | "footer"
 }) {
   const [form, setForm] = useState<FormState>(EMPTY)
   const [loading, setLoading] = useState(true)
@@ -130,7 +130,7 @@ export default function SiteContentPanel({
             onChange={(url) => set("logo_url", url)}
           />
           <p className="text-sm text-muted-foreground">
-            Si lo dejas vacío, se usa el logo actual (uploads/raabta-logo-color-primario.png).
+            Si lo dejas vacío, se muestra el nombre "Cieza Barber" como texto.
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
@@ -221,40 +221,17 @@ export default function SiteContentPanel({
       {section === "cards" && (
         <>
           <ImagePicker
-            label='Imagen tarjeta "Belleza"'
+            label='Imagen tarjeta "Productos"'
             value={form.belleza_image_url ?? null}
             onChange={(url) => set("belleza_image_url", url)}
           />
           <ImagePicker
-            label='Imagen tarjeta "Salón"'
+            label='Imagen tarjeta "Servicios"'
             value={form.salon_image_url ?? null}
             onChange={(url) => set("salon_image_url", url)}
           />
-          <ImagePicker
-            label='Imagen tarjeta "Academia"'
-            value={form.academia_image_url ?? null}
-            onChange={(url) => set("academia_image_url", url)}
-          />
           <p className="text-sm text-muted-foreground">
-            Si dejas vacía la imagen de "Belleza", se usa la foto del primer producto activo (se edita en Productos).
-          </p>
-        </>
-      )}
-
-      {section === "compare" && (
-        <>
-          <ImagePicker
-            label='Foto "Antes" (comparador Antes/Después, sección "Por qué elegir Raabta")'
-            value={form.compare_before_image ?? null}
-            onChange={(url) => set("compare_before_image", url)}
-          />
-          <ImagePicker
-            label='Foto "Después" (comparador Antes/Después, sección "Por qué elegir Raabta")'
-            value={form.compare_after_image ?? null}
-            onChange={(url) => set("compare_after_image", url)}
-          />
-          <p className="text-sm text-muted-foreground">
-            Usa la misma pose y encuadre en ambas fotos para que el deslizador de comparación se vea natural.
+            Si dejas vacía la imagen de "Productos", se usa la foto del primer producto activo (se edita en Productos).
           </p>
         </>
       )}

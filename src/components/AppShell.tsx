@@ -3,7 +3,6 @@ import { NavLink } from "react-router-dom"
 import {
   CalendarCheck2,
   CalendarClock,
-  GraduationCap,
   Images,
   LogOut,
   MessagesSquare,
@@ -23,7 +22,6 @@ const NAV_ITEMS = [
   { to: "/disponibilidad", label: "Disponibilidad", icon: CalendarClock },
   { to: "/conversaciones", label: "Conversaciones", icon: MessagesSquare },
   { to: "/multimedia", label: "Multimedia", icon: Images },
-  { to: "/elearning", label: "E-learning", icon: GraduationCap },
 ]
 
 export default function AppShell({ children }: { children: ReactNode }) {
@@ -34,10 +32,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
       <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-sidebar text-sidebar-foreground">
         <div className="flex items-center gap-2 px-5 py-5">
           <div className="flex size-8 items-center justify-center rounded-full bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">
-            R
+            C
           </div>
           <div>
-            <div className="text-sm font-semibold">Panel Raabta</div>
+            <div className="text-sm font-semibold">Panel Cieza Barber</div>
             <div className="text-xs text-muted-foreground">Administración</div>
           </div>
         </div>

@@ -25,7 +25,7 @@ export default function Login() {
     <div className="flex min-h-svh items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">Panel Raabta</CardTitle>
+          <CardTitle className="text-xl">Panel Cieza Barber</CardTitle>
           <CardDescription>Inicia sesión para gestionar el sitio.</CardDescription>
         </CardHeader>
         <CardContent>

@@ -1,9 +1,8 @@
--- Fase 4: corrección de seguridad obligatoria. Hasta ahora "authenticated"
--- solo podía ser el staff (un usuario). Con alumnas registrándose vía
--- supabase.auth.signUp también son "authenticated" — sin este cambio,
--- cualquier alumna podría leer/escribir reservas, teléfonos de clientas y
--- el catálogo completo. Se reemplaza using(true) por using(is_staff()) en
--- toda política que hasta ahora asumía "authenticated == staff".
+-- Corrección de seguridad: reemplaza using(true) por using(is_staff()) en
+-- las tablas que solo debe poder tocar el staff — necesario en cuanto
+-- exista más de un tipo de usuario "authenticated" (mismo criterio que
+-- Raabta). Agrega también las columnas de logo/tarjetas/comparador de
+-- site_content y el bucket de imágenes del panel.
 
 drop policy "Authenticated can update bookings" on bookings;
 create policy "Staff can update bookings"
@@ -56,3 +55,45 @@ on site_content for update to authenticated using (is_staff()) with check (is_st
 drop policy "Authenticated can manage testimonials" on testimonials;
 create policy "Staff can manage testimonials"
 on testimonials for all to authenticated using (is_staff()) with check (is_staff());
+
+revoke execute on function handle_new_user() from public;
+revoke execute on function handle_new_user() from anon;
+revoke execute on function handle_new_user() from authenticated;
+
+revoke execute on function is_staff() from public;
+revoke execute on function is_staff() from anon;
+
+alter table site_content
+  add column salon_image_url text,
+  add column academia_image_url text;
+
+alter table site_content add column belleza_image_url text;
+
+alter table site_content add column logo_url text;
+
+alter table site_content
+  add column logo_header_height int not null default 54,
+  add column logo_footer_height int not null default 60;
+
+alter table site_content
+  add column compare_before_image text,
+  add column compare_after_image text;
+
+insert into storage.buckets (id, name, public) values ('site-media', 'site-media', true);
+
+create policy "Staff can list site-media objects"
+on storage.objects for select to authenticated
+using (bucket_id = 'site-media' and is_staff());
+
+create policy "Staff can upload site-media objects"
+on storage.objects for insert to authenticated
+with check (bucket_id = 'site-media' and is_staff());
+
+create policy "Staff can update site-media objects"
+on storage.objects for update to authenticated
+using (bucket_id = 'site-media' and is_staff())
+with check (bucket_id = 'site-media' and is_staff());
+
+create policy "Staff can delete site-media objects"
+on storage.objects for delete to authenticated
+using (bucket_id = 'site-media' and is_staff());

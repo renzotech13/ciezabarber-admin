@@ -30,12 +30,12 @@ insert into products (name, price, description, sort_order) values
 
 update site_content set
   hero_eyebrow = 'Los Olivos, Lima · Todos los días',
-  hero_title = 'Estilo y precisión en cada corte',
-  hero_subtitle = 'Barbería profesional: cortes clásicos, fade, diseño de barba y afeitado tradicional para el hombre moderno.',
+  hero_title = 'Barbería en Los Olivos, Lima',
+  hero_subtitle = 'Cieza Barber Studio: cortes clásicos, fade, diseño de barba y afeitado tradicional. Atendemos todos los días de 10am a 9pm.',
   about_eyebrow = 'Sobre Cieza Barber',
   about_title = 'Especialistas en cortes de precisión',
   about_body = 'En Cieza Barber Studio combinamos técnica clásica y tendencias actuales para que cada cliente salga con el mejor corte. Atendemos en Los Olivos todos los días.',
-  footer_tagline = 'Barbería profesional en Los Olivos: cortes, barba y productos de cuidado masculino.'
+  footer_tagline = 'Barbería en Los Olivos, Lima: cortes, barba y productos de cuidado masculino.'
 where id = 1;
 
 insert into testimonials (name, service, quote, sort_order, avatar_url) values

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { actualizarEstadoCita as actualizarEstadoCitaBot, BotApiError } from "@/lib/botApi"
-import { CITA_ESTADO_LABEL, type Cita, type CitaEstado } from "@/lib/types"
+import { BARBEROS, CITA_ESTADO_LABEL, type Barbero, type Cita, type CitaEstado } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -35,6 +35,10 @@ const FILTROS: { key: "all" | CitaEstado; label: string }[] = [
   { key: "completada", label: "Completadas" },
   { key: "no_asistio", label: "No asistió" },
   { key: "cancelada", label: "Canceladas" },
+]
+const BARBERO_FILTROS: { key: "all" | Barbero; label: string }[] = [
+  { key: "all", label: "Todos los barberos" },
+  ...BARBEROS.map((b) => ({ key: b, label: b })),
 ]
 
 function formatDateTime(iso: string) {
@@ -75,6 +79,7 @@ export default function Bookings() {
   const [citas, setCitas] = useState<CitaConDetalle[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<"all" | CitaEstado>("all")
+  const [barberoFilter, setBarberoFilter] = useState<"all" | Barbero>("all")
 
   useEffect(() => {
     let active = true
@@ -126,8 +131,11 @@ export default function Bookings() {
   }
 
   const filtered = useMemo(
-    () => (filter === "all" ? citas : citas.filter((c) => c.estado === filter)),
-    [citas, filter],
+    () =>
+      citas
+        .filter((c) => filter === "all" || c.estado === filter)
+        .filter((c) => barberoFilter === "all" || c.barbero === barberoFilter),
+    [citas, filter, barberoFilter],
   )
 
   const confirmadasCount = citas.filter((c) => c.estado === "confirmada").length
@@ -145,9 +153,19 @@ export default function Bookings() {
         </div>
       </div>
 
-      <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)} className="mb-4">
+      <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)} className="mb-3">
         <TabsList>
           {FILTROS.map((f) => (
+            <TabsTrigger key={f.key} value={f.key}>
+              {f.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
+
+      <Tabs value={barberoFilter} onValueChange={(v) => setBarberoFilter(v as typeof barberoFilter)} className="mb-4">
+        <TabsList>
+          {BARBERO_FILTROS.map((f) => (
             <TabsTrigger key={f.key} value={f.key}>
               {f.label}
             </TabsTrigger>
@@ -174,6 +192,7 @@ export default function Bookings() {
                   <TableHead>Fecha y hora</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Servicio</TableHead>
+                  <TableHead>Barbero</TableHead>
                   <TableHead>Origen</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
@@ -201,6 +220,9 @@ export default function Bookings() {
                       <TableCell className="max-w-56">
                         <span className="text-sm">{c.services.name}</span>
                         {c.notas && <div className="mt-0.5 text-xs text-muted-foreground">{c.notas}</div>}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {c.barbero ?? <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {c.creada_por === "bot" ? "WhatsApp" : "Web / manual"}

@@ -216,6 +216,12 @@ export const COMPROBANTE_ESTADO_LABEL: Record<ComprobanteEstado, string> = {
   en_revision: "Comprobante en revisión",
 }
 
+// Mismos 3 nombres que usan el bot (config/business.ts) y la web
+// (booking.js) — no hay tabla `barberos` todavía, así que tocar los tres
+// lados si se agrega o quita uno.
+export const BARBEROS = ["Cieza", "Nilton", "Bryan"] as const
+export type Barbero = (typeof BARBEROS)[number]
+
 export type Cita = {
   id: string
   cliente_id: string
@@ -225,6 +231,7 @@ export type Cita = {
   estado: CitaEstado
   creada_por: "bot" | "humano"
   notas: string | null
+  barbero: Barbero | null
   comprobante_estado: ComprobanteEstado
   comprobante_path: string | null
   comprobante_monto_detectado: number | null

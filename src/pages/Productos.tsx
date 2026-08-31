@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react"
 import { toast } from "sonner"
 import { ArrowDown, ArrowUp, Pencil, Plus } from "lucide-react"
 import { supabase } from "@/lib/supabase"
-import type { Product } from "@/lib/types"
+import { PRODUCT_TAGS, type Product, type ProductTag } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -37,6 +37,8 @@ function ProductFormDialog({
   const [price, setPrice] = useState("")
   const [description, setDescription] = useState("")
   const [imageUrl, setImageUrl] = useState("")
+  const [linea, setLinea] = useState("")
+  const [tags, setTags] = useState<ProductTag[]>([])
   const [active, setActive] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
@@ -46,8 +48,14 @@ function ProductFormDialog({
     setPrice(product ? String(product.price) : "")
     setDescription(product?.description ?? "")
     setImageUrl(product?.image_url ?? "")
+    setLinea(product?.linea ?? "")
+    setTags(product?.tags ?? [])
     setActive(product?.active ?? true)
   }, [open, product])
+
+  function toggleTag(tag: ProductTag) {
+    setTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -57,6 +65,8 @@ function ProductFormDialog({
       price: Number(price),
       description: description.trim(),
       image_url: imageUrl.trim() || null,
+      linea: linea.trim() || null,
+      tags,
       active,
     }
 
@@ -106,6 +116,26 @@ function ProductFormDialog({
             value={imageUrl || null}
             onChange={(url) => setImageUrl(url ?? "")}
           />
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="prod-linea">Línea (opcional)</Label>
+            <Input id="prod-linea" placeholder="Ej. Deep, Fat, mr. muk" value={linea} onChange={(e) => setLinea(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label>Categorías (filtros de la tienda)</Label>
+            <div className="flex flex-wrap gap-x-4 gap-y-2">
+              {PRODUCT_TAGS.map((t) => (
+                <label key={t.value} className="flex items-center gap-1.5 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4 rounded border-input accent-primary"
+                    checked={tags.includes(t.value)}
+                    onChange={() => toggleTag(t.value)}
+                  />
+                  {t.label}
+                </label>
+              ))}
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             <Switch id="prod-active" checked={active} onCheckedChange={setActive} />
             <Label htmlFor="prod-active">Activo (visible en el sitio)</Label>
@@ -189,7 +219,7 @@ export default function Productos() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Productos</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            El catálogo de belleza que se muestra en index.html.
+            El catálogo MUK que se muestra en la tienda del sitio.
           </p>
         </div>
         <Button
@@ -245,7 +275,9 @@ export default function Productos() {
                   </TableCell>
                   <TableCell>
                     <div className="font-medium">{p.name}</div>
-                    <div className="max-w-80 truncate text-xs text-muted-foreground">{p.description}</div>
+                    <div className="max-w-80 truncate text-xs text-muted-foreground">
+                      {[p.linea, p.description].filter(Boolean).join(" — ")}
+                    </div>
                   </TableCell>
                   <TableCell className="text-sm">S/ {p.price}</TableCell>
                   <TableCell>

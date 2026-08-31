@@ -51,6 +51,17 @@ export type Service = {
   updated_at: string
 }
 
+// Categorías de filtro que usa la tienda del sitio (web/assets/tienda.js) —
+// tocar los dos lados si se agrega o quita una.
+export const PRODUCT_TAGS = [
+  { value: "shampoos", label: "Shampoos & acondicionadores" },
+  { value: "tratamientos", label: "Tratamientos" },
+  { value: "estilismo", label: "Estilismo" },
+  { value: "hombre", label: "Cuidado del hombre" },
+  { value: "packs", label: "Dúos & tríos" },
+] as const
+export type ProductTag = (typeof PRODUCT_TAGS)[number]["value"]
+
 export type Product = {
   id: string
   name: string
@@ -59,6 +70,8 @@ export type Product = {
   image_url: string | null
   active: boolean
   sort_order: number
+  linea: string | null
+  tags: ProductTag[]
   created_at: string
   updated_at: string
 }

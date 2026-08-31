@@ -143,13 +143,17 @@ export default function ChatThread({ conversacion }: { conversacion: Conversacio
   async function alternarModo(humano: boolean) {
     if (!conversacion) return
     setCambiandoModo(true)
-    const { error } = await supabase
+    // .select() para poder distinguir "no hay permiso / RLS bloqueó el
+    // update" (data vacío, sin error) de un fallo real — un update sin
+    // policy que lo permita no lanza error, simplemente no toca filas.
+    const { data, error } = await supabase
       .from("conversaciones")
       .update({ estado: humano ? "escalada" : "activa" })
       .eq("id", conversacion.id)
+      .select("id")
     setCambiandoModo(false)
 
-    if (error) {
+    if (error || !data?.length) {
       toast.error("No se pudo cambiar el modo de la conversación.")
       return
     }

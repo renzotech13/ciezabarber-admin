@@ -2,7 +2,6 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
 import { AuthProvider, useAuth } from "@/lib/auth"
 import Login from "@/pages/Login"
 import Bookings from "@/pages/Bookings"
-import Front from "@/pages/Front"
 import Productos from "@/pages/Productos"
 import Servicios from "@/pages/Servicios"
 import CRM from "@/pages/CRM"
@@ -20,7 +19,6 @@ function Gate() {
     <AppShell>
       <Routes>
         <Route path="/" element={<Navigate to="/reservas" replace />} />
-        <Route path="/front" element={<Front />} />
         <Route path="/productos" element={<Productos />} />
         <Route path="/servicios" element={<Servicios />} />
         <Route path="/reservas" element={<Bookings />} />

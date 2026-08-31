@@ -6,7 +6,6 @@ import {
   Images,
   LogOut,
   MessagesSquare,
-  PenLine,
   ShoppingBag,
   Sparkles,
 } from "lucide-react"
@@ -15,7 +14,6 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
 const NAV_ITEMS = [
-  { to: "/front", label: "Front", icon: PenLine },
   { to: "/productos", label: "Productos", icon: ShoppingBag },
   { to: "/servicios", label: "Servicios", icon: Sparkles },
   { to: "/reservas", label: "Reservas", icon: CalendarCheck2 },

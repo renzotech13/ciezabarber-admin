@@ -212,13 +212,25 @@ export const ETIQUETA_CLASSES: Record<EtiquetaColor, string> = {
   violet: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-200",
 }
 
-export type CitaEstado = "confirmada" | "cancelada" | "completada" | "no_asistio"
+export type CitaEstado =
+  | "pendiente_pago"
+  | "confirmada"
+  | "cancelada"
+  | "completada"
+  | "no_asistio"
+  | "expirada"
 
+// "pendiente_pago" = el horario está apartado pero la cita NO está agendada:
+// se está esperando la captura del adelanto. "expirada" = ese plazo venció y
+// el bot liberó el horario solo (distinto de "cancelada", que es alguien
+// echándose atrás a propósito).
 export const CITA_ESTADO_LABEL: Record<CitaEstado, string> = {
+  pendiente_pago: "Esperando adelanto",
   confirmada: "Confirmada",
   cancelada: "Cancelada",
   completada: "Completada",
   no_asistio: "No asistió",
+  expirada: "Liberada sin adelanto",
 }
 
 export type ComprobanteEstado = "sin_comprobante" | "confirmado" | "en_revision"
@@ -249,6 +261,26 @@ export type Cita = {
   comprobante_path: string | null
   comprobante_monto_detectado: number | null
   comprobante_nota: string | null
+  comprobante_origen: "whatsapp" | "web" | null
+  deposito_esperado: number | null
+  deposito_solicitado_at: string | null
+  deposito_aviso_at: string | null
+  deposito_expirado_at: string | null
+  reserva_id: string
+  /** Lo que el barbero anota DESPUÉS de atender: el corte real, el tono, la máquina. */
+  atencion_notas: string | null
+}
+
+/** Ficha del cliente: lo que el barbero repasa antes de atenderlo. */
+export type FichaCliente = {
+  id: string
+  nombre: string | null
+  telefono: string
+  email: string | null
+  notas: string | null
+  preferencias: string | null
+  alergias: string | null
+  created_at: string
 }
 
 export type NotificacionEstado = "pendiente" | "enviada" | "fallida" | "cancelada"

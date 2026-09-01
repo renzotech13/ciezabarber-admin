@@ -1,8 +1,17 @@
-import { useEffect, useMemo, useState } from "react"
+import { Fragment, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { actualizarEstadoCita as actualizarEstadoCitaBot, BotApiError } from "@/lib/botApi"
-import { BARBEROS, CITA_ESTADO_LABEL, type Barbero, type Cita, type CitaEstado } from "@/lib/types"
+import {
+  BARBEROS,
+  CITA_ESTADO_LABEL,
+  COMPROBANTE_ESTADO_LABEL,
+  type Barbero,
+  type Cita,
+  type CitaEstado,
+} from "@/lib/types"
+import FichaReserva from "@/components/FichaReserva"
+import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -20,7 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ChevronDown } from "lucide-react"
+import { ChevronDown, ChevronRight, Image as ImageIcon } from "lucide-react"
 
 /** Cita + los datos del cliente y servicio que trae el join de Supabase. */
 type CitaConDetalle = Cita & {
@@ -28,9 +37,12 @@ type CitaConDetalle = Cita & {
   services: { name: string }
 }
 
+// "expirada" no está en el menú de cambio de estado: la pone el bot al
+// liberar un horario sin adelanto, no es algo que el staff marque a mano.
 const ESTADO_ORDER: CitaEstado[] = ["confirmada", "completada", "no_asistio", "cancelada"]
 const FILTROS: { key: "all" | CitaEstado; label: string }[] = [
   { key: "all", label: "Todas" },
+  { key: "pendiente_pago", label: "Esperando adelanto" },
   { key: "confirmada", label: "Confirmadas" },
   { key: "completada", label: "Completadas" },
   { key: "no_asistio", label: "No asistió" },
@@ -53,10 +65,12 @@ function formatDateTime(iso: string) {
 // 'bookings' (pending/confirmed/cancelled/completed) — se reutilizan por
 // significado en vez de duplicar tokens de CSS para el enum de citas.
 const ESTADO_COLOR_TOKEN: Record<CitaEstado, string> = {
+  pendiente_pago: "pending",
   confirmada: "confirmed",
   completada: "completed",
   cancelada: "cancelled",
   no_asistio: "pending",
+  expirada: "cancelled",
 }
 
 function StatusBadge({ estado }: { estado: CitaEstado }) {
@@ -78,6 +92,9 @@ function StatusBadge({ estado }: { estado: CitaEstado }) {
 export default function Bookings() {
   const [citas, setCitas] = useState<CitaConDetalle[]>([])
   const [loading, setLoading] = useState(true)
+  // Una fila abierta a la vez: la ficha es alta y con dos abiertas se pierde
+  // la tabla de vista.
+  const [abierta, setAbierta] = useState<string | null>(null)
   const [filter, setFilter] = useState<"all" | CitaEstado>("all")
   const [barberoFilter, setBarberoFilter] = useState<"all" | Barbero>("all")
 
@@ -201,10 +218,20 @@ export default function Bookings() {
               <TableBody>
                 {filtered.map((c) => {
                   const { fecha, hora } = formatDateTime(c.inicio_utc)
+                  const expandida = abierta === c.id
                   return (
-                    <TableRow key={c.id}>
+                    <Fragment key={c.id}>
+                    <TableRow
+                      onClick={() => setAbierta(expandida ? null : c.id)}
+                      className="cursor-pointer"
+                    >
                       <TableCell className="whitespace-nowrap font-medium capitalize">
-                        {fecha} · {hora}
+                        <span className="inline-flex items-center gap-1.5">
+                          <ChevronRight
+                            className={cn("size-3.5 text-muted-foreground transition-transform", expandida && "rotate-90")}
+                          />
+                          {fecha} · {hora}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <div className="font-medium">{c.clientes.nombre?.trim() || "Sin nombre"}</div>
@@ -229,8 +256,14 @@ export default function Bookings() {
                       </TableCell>
                       <TableCell>
                         <StatusBadge estado={c.estado} />
+                        {c.comprobante_estado !== "sin_comprobante" && (
+                          <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                            <ImageIcon className="size-3" />
+                            {COMPROBANTE_ESTADO_LABEL[c.comprobante_estado]}
+                          </div>
+                        )}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
                           <DropdownMenuTrigger className="inline-flex items-center gap-1 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-accent">
                             Cambiar estado
@@ -250,6 +283,14 @@ export default function Bookings() {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
+                    {expandida && (
+                      <TableRow className="hover:bg-transparent">
+                        <TableCell colSpan={7} className="bg-muted/40 p-0">
+                          <FichaReserva cita={c} />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    </Fragment>
                   )
                 })}
               </TableBody>

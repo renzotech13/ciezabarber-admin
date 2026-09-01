@@ -14,6 +14,13 @@ import {
   etiquetaCorta, etiquetaLarga, formatoSoles,
 } from "./rango"
 
+type CostoProducto = {
+  producto_id: string
+  costo_proveedor: number
+  costo_venta: number
+  costo_oferta: number
+}
+
 type Venta = {
   id: string
   producto_id: string
@@ -77,10 +84,54 @@ function StockEditable({ producto, alGuardar }: { producto: Product; alGuardar: 
   )
 }
 
+/**
+ * Input decimal que guarda al salir del campo o con Enter — mismo patrón que
+ * StockEditable, pero para los costos de proveedor (admiten decimales).
+ */
+function CostoEditable({ valor: inicial, onGuardar }: { valor: number; onGuardar: (n: number) => Promise<void> }) {
+  const [valor, setValor] = useState(String(inicial))
+  const [guardando, setGuardando] = useState(false)
+  useEffect(() => setValor(String(inicial)), [inicial])
+
+  async function guardar() {
+    if (guardando) return
+    if (valor.trim() === "") {
+      setValor(String(inicial))
+      return
+    }
+    const n = Number(valor)
+    if (!Number.isFinite(n) || n < 0) {
+      setValor(String(inicial))
+      return
+    }
+    if (n === inicial) return
+    setGuardando(true)
+    await onGuardar(n)
+    setGuardando(false)
+  }
+
+  return (
+    <Input
+      type="number"
+      min={0}
+      step="0.1"
+      value={valor}
+      disabled={guardando}
+      onChange={(e) => setValor(e.target.value)}
+      onBlur={guardar}
+      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+      className="tnum h-8 w-24 text-right"
+    />
+  )
+}
+
 export default function Productos({ rango }: { rango: Rango }) {
   const { session } = useAuth()
   const [productos, setProductos] = useState<Product[]>([])
   const [ventas, setVentas] = useState<Venta[]>([])
+  // Por producto_id — no depende del rango, es el costo vigente, no un
+  // histórico por periodo.
+  const [costos, setCostos] = useState<Map<string, CostoProducto>>(new Map())
   const [cargando, setCargando] = useState(true)
 
   const [dialogAbierto, setDialogAbierto] = useState(false)
@@ -96,7 +147,7 @@ export default function Productos({ rango }: { rango: Rango }) {
 
   const cargar = useCallback(async () => {
     const version = ++versionCarga.current
-    const [prodRes, ventasRes] = await Promise.all([
+    const [prodRes, ventasRes, costosRes] = await Promise.all([
       supabase.from("products").select("*").order("sort_order"),
       supabase
         .from("ventas_productos")
@@ -104,15 +155,18 @@ export default function Productos({ rango }: { rango: Rango }) {
         .gte("vendido_at", inicioDiaLimaUTC(rango.desde))
         .lt("vendido_at", finDiaLimaUTC(rango.hasta))
         .order("vendido_at", { ascending: false }),
+      supabase.from("costos_producto").select("*"),
     ])
     if (version !== versionCarga.current) return
-    if (prodRes.error || ventasRes.error) {
+    if (prodRes.error || ventasRes.error || costosRes.error) {
       toast.error("No se pudieron cargar productos o ventas.")
       setProductos([])
       setVentas([])
+      setCostos(new Map())
     } else {
       setProductos(prodRes.data as Product[])
       setVentas(ventasRes.data as unknown as Venta[])
+      setCostos(new Map((costosRes.data as CostoProducto[]).map((c) => [c.producto_id, c])))
     }
     setCargando(false)
   }, [rango.desde, rango.hasta])
@@ -241,6 +295,33 @@ export default function Productos({ rango }: { rango: Rango }) {
     setAnulando(null)
   }
 
+  /** Upsert parcial: solo el campo tocado — costos_producto.producto_id es PK,
+   *  así que si la fila no existía se crea con los otros dos costos en 0. */
+  async function guardarCosto(productoId: string, campo: keyof Omit<CostoProducto, "producto_id">, valor: number) {
+    const { error } = await supabase
+      .from("costos_producto")
+      .upsert({ producto_id: productoId, [campo]: valor }, { onConflict: "producto_id" })
+    if (error) {
+      toast.error("No se pudo guardar el costo.")
+      return
+    }
+    setCostos((prev) => {
+      const siguiente = new Map(prev)
+      const actual = siguiente.get(productoId) ?? { producto_id: productoId, costo_proveedor: 0, costo_venta: 0, costo_oferta: 0 }
+      siguiente.set(productoId, { ...actual, [campo]: valor })
+      return siguiente
+    })
+  }
+
+  // Lo que hoy le deberías a MUK si vendieras todo el stock, y el margen que
+  // te queda si lo vendes al precio de referencia — la parte de "contaduría"
+  // que pediste, sin tocar precio_unitario de las ventas ya registradas.
+  const costoProveedorStock = activos.reduce((s, p) => s + p.stock * (costos.get(p.id)?.costo_proveedor ?? 0), 0)
+  const margenPotencialStock = activos.reduce((s, p) => {
+    const c = costos.get(p.id)
+    return s + p.stock * ((c?.costo_venta ?? 0) - (c?.costo_proveedor ?? 0))
+  }, 0)
+
   if (cargando) {
     return (
       <div className="flex items-center gap-2 py-16 text-sm text-muted-foreground">
@@ -256,6 +337,10 @@ export default function Productos({ rango }: { rango: Rango }) {
         <Tile etiqueta="Ingresos por productos" valor={formatoSoles(ingresos)} />
         <Tile etiqueta="Valor del stock" valor={formatoSoles(valorStock)} detalle={`${activos.length} activos`} />
         <Tile etiqueta="Agotados" valor={String(agotados)} />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Tile etiqueta="Le debes a MUK (stock actual)" valor={formatoSoles(costoProveedorStock)} detalle="a precio de proveedor" />
+        <Tile etiqueta="Margen potencial del stock" valor={formatoSoles(margenPotencialStock)} detalle="venta − proveedor" />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[2fr_3fr]">
@@ -315,6 +400,59 @@ export default function Productos({ rango }: { rango: Rango }) {
             </tbody>
           </table>
         </div>
+      </Ficha>
+
+      <Ficha>
+        <CabeceraFicha
+          mini="MUK deja el catálogo en concesión — solo tú ves esto"
+          titulo="Costos de proveedor"
+        />
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="border-b border-border text-left">
+                <th className="brand-serif px-4 py-2.5 font-normal text-muted-foreground">Producto</th>
+                <th className="brand-wide px-3 py-2.5 text-right text-[10px]">Costo proveedor</th>
+                <th className="brand-wide px-3 py-2.5 text-right text-[10px]">Costo venta</th>
+                <th className="brand-wide px-3 py-2.5 text-right text-[10px]">Costo oferta</th>
+                <th className="brand-wide border-l border-border px-3 py-2.5 text-right text-[10px]">Margen</th>
+                <th className="brand-wide px-4 py-2.5 text-right text-[10px]">Margen oferta</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activos.map((p) => {
+                const c = costos.get(p.id) ?? { producto_id: p.id, costo_proveedor: 0, costo_venta: 0, costo_oferta: 0 }
+                const margen = c.costo_venta - c.costo_proveedor
+                const margenOferta = c.costo_oferta - c.costo_proveedor
+                return (
+                  <tr key={p.id} className="border-b border-border/60 last:border-b-0">
+                    <td className="max-w-56 truncate px-4 py-2">{p.name}</td>
+                    <td className="px-3 py-2 text-right">
+                      <CostoEditable valor={c.costo_proveedor} onGuardar={(n) => guardarCosto(p.id, "costo_proveedor", n)} />
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <CostoEditable valor={c.costo_venta} onGuardar={(n) => guardarCosto(p.id, "costo_venta", n)} />
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <CostoEditable valor={c.costo_oferta} onGuardar={(n) => guardarCosto(p.id, "costo_oferta", n)} />
+                    </td>
+                    <td className={`tnum border-l border-border px-3 py-2 text-right ${margen < 0 ? "text-status-cancelled" : ""}`}>
+                      {formatoSoles(margen)}
+                    </td>
+                    <td className={`tnum px-4 py-2 text-right ${margenOferta < 0 ? "text-status-cancelled" : ""}`}>
+                      {formatoSoles(margenOferta)}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="brand-serif border-t border-border px-4 py-2.5 text-[12px] text-muted-foreground">
+          "Costo venta" es el precio de referencia para medir el margen — puede diferir del precio real de la tienda si lo
+          actualizaste después. "Costo oferta" es el piso: bajar de ahí en un descuento ya pierde margen sobre lo que le debes a
+          MUK (en rojo).
+        </p>
       </Ficha>
 
       <Ficha>

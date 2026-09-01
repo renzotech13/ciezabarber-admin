@@ -1,13 +1,13 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
     --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif;
+    --font-sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --font-serif: "Instrument Serif", Georgia, serif;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -57,38 +57,43 @@
 }
 
 :root {
-    --background: oklch(0.985 0.006 75);
-    --foreground: oklch(0.24 0.025 45);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.24 0.025 45);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.24 0.025 45);
-    --primary: oklch(0.55 0.11 55);
-    --primary-foreground: oklch(0.99 0.005 75);
-    --secondary: oklch(0.955 0.014 70);
-    --secondary-foreground: oklch(0.32 0.05 45);
-    --muted: oklch(0.955 0.014 70);
-    --muted-foreground: oklch(0.52 0.03 50);
-    --accent: oklch(0.93 0.03 65);
-    --accent-foreground: oklch(0.32 0.05 45);
-    --destructive: oklch(0.577 0.19 25);
-    --border: oklch(0.9 0.018 65);
-    --input: oklch(0.9 0.018 65);
-    --ring: oklch(0.55 0.11 55);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.5rem;
-    --sidebar: oklch(0.97 0.012 70);
-    --sidebar-foreground: oklch(0.24 0.025 45);
-    --sidebar-primary: oklch(0.55 0.11 55);
-    --sidebar-primary-foreground: oklch(0.99 0.005 75);
-    --sidebar-accent: oklch(0.93 0.03 65);
-    --sidebar-accent-foreground: oklch(0.32 0.05 45);
-    --sidebar-border: oklch(0.9 0.018 65);
-    --sidebar-ring: oklch(0.55 0.11 55);
+    /* Paleta del sitio público (web/assets/site.css): beige #f5f4f1, negro
+       #0a090c, líneas #e0ded7 — el panel comparte identidad con la portada. */
+    --background: #f5f4f1;
+    --foreground: #0a090c;
+    --card: #ffffff;
+    --card-foreground: #0a090c;
+    --popover: #ffffff;
+    --popover-foreground: #0a090c;
+    --primary: #0a090c;
+    --primary-foreground: #f5f4f1;
+    --secondary: #ecebe6;
+    --secondary-foreground: #0a090c;
+    --muted: #ecebe6;
+    --muted-foreground: #6e6f68;
+    --accent: #ecebe6;
+    --accent-foreground: #0a090c;
+    --destructive: #b4342f;
+    --border: #e0ded7;
+    --input: #e0ded7;
+    --ring: #0a090c;
+    /* Series de datos del Control: cobre / verde botella / índigo — validadas
+       (contraste, CVD) sobre tarjeta blanca. Orden fijo: Cieza, Nilton, Bryan. */
+    --chart-1: #a34d14;
+    --chart-2: #0b8560;
+    --chart-3: #5a55c9;
+    --chart-4: #8d8e87;
+    --chart-5: #3d3d3d;
+    --radius: 0rem;
+    /* Sidebar negra: el plano oscuro del sitio (footer/hero) llevado al panel. */
+    --sidebar: #0a090c;
+    --sidebar-foreground: #c9c8c2;
+    --sidebar-primary: #f5f4f1;
+    --sidebar-primary-foreground: #0a090c;
+    --sidebar-accent: #f5f4f1;
+    --sidebar-accent-foreground: #0a090c;
+    --sidebar-border: #2c2b2c;
+    --sidebar-ring: #f5f4f1;
     --status-pending: oklch(0.62 0.14 65);
     --status-pending-bg: oklch(0.94 0.05 65);
     --status-confirmed: oklch(0.5 0.13 155);
@@ -100,37 +105,37 @@
 }
 
 .dark {
-    --background: oklch(0.19 0.018 45);
-    --foreground: oklch(0.94 0.012 70);
-    --card: oklch(0.23 0.02 45);
-    --card-foreground: oklch(0.94 0.012 70);
-    --popover: oklch(0.23 0.02 45);
-    --popover-foreground: oklch(0.94 0.012 70);
-    --primary: oklch(0.72 0.11 60);
-    --primary-foreground: oklch(0.19 0.018 45);
-    --secondary: oklch(0.28 0.02 45);
-    --secondary-foreground: oklch(0.94 0.012 70);
-    --muted: oklch(0.28 0.02 45);
-    --muted-foreground: oklch(0.68 0.02 60);
-    --accent: oklch(0.32 0.03 55);
-    --accent-foreground: oklch(0.94 0.012 70);
-    --destructive: oklch(0.704 0.19 22);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.72 0.11 60);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.21 0.02 45);
-    --sidebar-foreground: oklch(0.94 0.012 70);
-    --sidebar-primary: oklch(0.72 0.11 60);
-    --sidebar-primary-foreground: oklch(0.19 0.018 45);
-    --sidebar-accent: oklch(0.32 0.03 55);
-    --sidebar-accent-foreground: oklch(0.94 0.012 70);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.72 0.11 60);
+    --background: #0a090c;
+    --foreground: #f5f4f1;
+    --card: #141317;
+    --card-foreground: #f5f4f1;
+    --popover: #141317;
+    --popover-foreground: #f5f4f1;
+    --primary: #f5f4f1;
+    --primary-foreground: #0a090c;
+    --secondary: #1d1c20;
+    --secondary-foreground: #f5f4f1;
+    --muted: #1d1c20;
+    --muted-foreground: #a3a49c;
+    --accent: #1d1c20;
+    --accent-foreground: #f5f4f1;
+    --destructive: #e06d68;
+    --border: #2c2b2c;
+    --input: #2c2b2c;
+    --ring: #f5f4f1;
+    --chart-1: #c9743a;
+    --chart-2: #2aa77e;
+    --chart-3: #8a85e0;
+    --chart-4: #8d8e87;
+    --chart-5: #c9c8c2;
+    --sidebar: #0a090c;
+    --sidebar-foreground: #c9c8c2;
+    --sidebar-primary: #f5f4f1;
+    --sidebar-primary-foreground: #0a090c;
+    --sidebar-accent: #f5f4f1;
+    --sidebar-accent-foreground: #0a090c;
+    --sidebar-border: #2c2b2c;
+    --sidebar-ring: #f5f4f1;
     --status-pending: oklch(0.78 0.12 65);
     --status-pending-bg: oklch(0.3 0.06 65);
     --status-confirmed: oklch(0.75 0.13 155);
@@ -152,3 +157,48 @@
     @apply font-sans;
     }
 }
+/* ---- Identidad Cieza Barber (mismo lenguaje que web/assets/site.css) ------ */
+@layer utilities {
+  /* Titulares: Archivo ancha (eje wdth 125%) en mayúsculas — el sello del sitio. */
+  .brand-display {
+    font-weight: 700;
+    font-stretch: 125%;
+    text-transform: uppercase;
+    letter-spacing: -0.01em;
+    line-height: 0.96;
+  }
+  /* UI destacada (botones, cifras, labels de nav): 112% como en el sitio. */
+  .brand-wide {
+    font-weight: 700;
+    font-stretch: 112%;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    line-height: 1;
+  }
+  .brand-serif {
+    font-family: var(--font-serif);
+    letter-spacing: 0.01em;
+  }
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Chip de filtro del sitio: borde negro, padding asimétrico para centrar la
+   mayúscula ópticamente, estado .on invertido a negro. */
+.chip23 {
+  border: 1px solid var(--foreground);
+  padding: 9px 14px 7px;
+  font-size: 12px;
+  font-weight: 700;
+  font-stretch: 112%;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  transition: background 0.2s, color 0.2s;
+  cursor: pointer;
+  background: transparent;
+  color: var(--foreground);
+}
+.chip23:hover { background: var(--secondary); }
+.chip23.on { background: var(--foreground); color: var(--background); }

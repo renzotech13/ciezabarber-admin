@@ -72,8 +72,22 @@ export type Product = {
   sort_order: number
   linea: string | null
   tags: ProductTag[]
+  stock: number
   created_at: string
   updated_at: string
+}
+
+/** Venta manual de producto registrada desde Control (solo superadmin).
+ *  El trigger de la BD descuenta el stock al insertar y lo repone al anular. */
+export type VentaProducto = {
+  id: string
+  producto_id: string
+  cantidad: number
+  precio_unitario: number
+  vendido_at: string
+  nota: string | null
+  registrado_por: string | null
+  created_at: string
 }
 
 export type SiteContent = {
@@ -112,9 +126,11 @@ export type Testimonial = {
   updated_at: string
 }
 
+export type ProfileRole = "staff" | "alumna" | "superadmin"
+
 export type Profile = {
   id: string
-  role: "staff" | "alumna"
+  role: ProfileRole
   full_name: string | null
   phone: string | null
   created_at: string

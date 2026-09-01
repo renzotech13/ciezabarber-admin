@@ -25,8 +25,10 @@ export default function Login() {
     <div className="flex min-h-svh items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-xl">Panel Cieza Barber</CardTitle>
-          <CardDescription>Inicia sesión para gestionar el sitio.</CardDescription>
+          <CardTitle className="brand-display text-[26px]">
+            Cieza Barber<span className="text-muted-foreground">.</span>
+          </CardTitle>
+          <CardDescription className="brand-serif text-[14px]">Panel del estudio — inicia sesión.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">

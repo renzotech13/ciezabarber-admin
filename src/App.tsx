@@ -7,10 +7,11 @@ import Servicios from "@/pages/Servicios"
 import CRM from "@/pages/CRM"
 import Disponibilidad from "@/pages/Disponibilidad"
 import Multimedia from "@/pages/Multimedia"
+import Control from "@/pages/Control"
 import AppShell from "@/components/AppShell"
 
 function Gate() {
-  const { session, loading } = useAuth()
+  const { session, loading, role, roleCargando } = useAuth()
 
   if (loading) return null
   if (!session) return <Login />
@@ -25,6 +26,15 @@ function Gate() {
         <Route path="/disponibilidad" element={<Disponibilidad />} />
         <Route path="/conversaciones" element={<CRM />} />
         <Route path="/multimedia" element={<Multimedia />} />
+        {/* Lo financiero es solo del dueño. Mientras el rol aún se consulta no
+            se decide nada — si rebotáramos ya, un superadmin entrando con el
+            enlace directo a /control acabaría siempre en Reservas. */}
+        <Route
+          path="/control"
+          element={
+            roleCargando ? null : role === "superadmin" ? <Control /> : <Navigate to="/reservas" replace />
+          }
+        />
         <Route path="*" element={<Navigate to="/reservas" replace />} />
       </Routes>
     </AppShell>

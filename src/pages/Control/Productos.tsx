@@ -203,6 +203,10 @@ export default function Productos({ rango }: { rango: Rango }) {
     if (producto && cantidad > producto.stock) {
       return toast.error(`Solo hay ${producto.stock} en stock de ${producto.name} — ajusta el stock primero si se vendió igual.`)
     }
+    // La policy de venta exige registrado_por = auth.uid() exacto (0018): sin
+    // sesión no hay a quién atribuírsela, y un intento igual fallaría en RLS
+    // con un error menos legible que este.
+    if (!session?.user.id) return toast.error("Tu sesión expiró — vuelve a iniciar sesión.")
 
     setGuardandoVenta(true)
     const { error } = await supabase.from("ventas_productos").insert({
@@ -210,7 +214,7 @@ export default function Productos({ rango }: { rango: Rango }) {
       cantidad,
       precio_unitario: precio,
       nota: ventaNota.trim() || null,
-      registrado_por: session?.user.id ?? null,
+      registrado_por: session.user.id,
     })
     setGuardandoVenta(false)
     if (error) {

@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react"
 import { toast } from "sonner"
-import { ArrowDown, ArrowUp, Pencil, Plus } from "lucide-react"
+import { ArrowDown, ArrowUp, Pencil, Plus, ShoppingCart } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { PRODUCT_TAGS, type Product, type ProductTag } from "@/lib/types"
 import { Button } from "@/components/ui/button"
@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import RegistrarVentaDialog from "@/components/RegistrarVentaDialog"
 
 function ProductFormDialog({
   open,
@@ -156,6 +157,7 @@ export default function Productos() {
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Product | null>(null)
+  const [ventaDialogOpen, setVentaDialogOpen] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -222,17 +224,25 @@ export default function Productos() {
             El catálogo MUK que se muestra en la tienda del sitio.
           </p>
         </div>
-        <Button
-          size="sm"
-          onClick={() => {
-            setEditing(null)
-            setDialogOpen(true)
-          }}
-        >
-          <Plus className="size-4" />
-          Nuevo producto
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => setVentaDialogOpen(true)}>
+            <ShoppingCart className="size-4" />
+            Registrar venta
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              setEditing(null)
+              setDialogOpen(true)
+            }}
+          >
+            <Plus className="size-4" />
+            Nuevo producto
+          </Button>
+        </div>
       </div>
+
+      <RegistrarVentaDialog productos={products} open={ventaDialogOpen} onOpenChange={setVentaDialogOpen} />
 
       <div className="overflow-hidden rounded-lg border border-border bg-card">
         {loading ? (

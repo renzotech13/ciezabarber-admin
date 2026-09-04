@@ -1,10 +1,11 @@
 import { useState } from "react"
 import Comisiones from "./Comisiones"
 import Productos from "./Productos"
+import Caja from "./Caja"
 import { RANGOS, type RangoClave, calcularRango, etiquetaLarga } from "./rango"
 import { cn } from "@/lib/utils"
 
-type Pestania = "comisiones" | "productos"
+type Pestania = "comisiones" | "productos" | "caja"
 
 /**
  * La parte financiera del negocio, solo para el superadmin: el cuaderno de
@@ -34,6 +35,7 @@ export default function Control() {
             [
               { clave: "comisiones", etiqueta: "Comisiones" },
               { clave: "productos", etiqueta: "Productos" },
+              { clave: "caja", etiqueta: "Caja" },
             ] as { clave: Pestania; etiqueta: string }[]
           ).map((t) => (
             <button
@@ -61,7 +63,14 @@ export default function Control() {
         </div>
       </div>
 
-      {pestania === "comisiones" ? <Comisiones rango={rango} /> : <Productos rango={rango} />}
+      {pestania === "comisiones" ? (
+        <Comisiones rango={rango} />
+      ) : pestania === "productos" ? (
+        <Productos rango={rango} />
+      ) : (
+        // La caja es del turno vivo, no del rango de fechas de arriba.
+        <Caja />
+      )}
     </div>
   )
 }

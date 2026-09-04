@@ -3,8 +3,10 @@ import { toast } from "sonner"
 import { Loader2, Plus, Trash2 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/lib/auth"
-import type { Product } from "@/lib/types"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { METODOS_PAGO, METODO_PAGO_LABEL, type MetodoPago, type Product } from "@/lib/types"
+import type { FiltroMetodo } from "./index"
+import { ModalFicha } from "@/components/ModalFicha"
+import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { GraficoBarrasH, GraficoLinea } from "./charts"
@@ -27,6 +29,7 @@ type Venta = {
   cantidad: number
   precio_unitario: number
   vendido_at: string
+  metodo_pago: string | null
   nota: string | null
   products: { name: string }
 }
@@ -125,7 +128,7 @@ function CostoEditable({ valor: inicial, onGuardar }: { valor: number; onGuardar
   )
 }
 
-export default function Productos({ rango }: { rango: Rango }) {
+export default function Productos({ rango, metodo }: { rango: Rango; metodo: FiltroMetodo }) {
   const { session } = useAuth()
   const [productos, setProductos] = useState<Product[]>([])
   const [ventas, setVentas] = useState<Venta[]>([])
@@ -138,6 +141,7 @@ export default function Productos({ rango }: { rango: Rango }) {
   const [ventaProducto, setVentaProducto] = useState("")
   const [ventaCantidad, setVentaCantidad] = useState("1")
   const [ventaPrecio, setVentaPrecio] = useState("")
+  const [ventaMetodo, setVentaMetodo] = useState<MetodoPago | null>(null)
   const [ventaNota, setVentaNota] = useState("")
   const [guardandoVenta, setGuardandoVenta] = useState(false)
   const [anulando, setAnulando] = useState<string | null>(null)
@@ -147,14 +151,17 @@ export default function Productos({ rango }: { rango: Rango }) {
 
   const cargar = useCallback(async () => {
     const version = ++versionCarga.current
+    // Mismo criterio que en Comisiones: filtrando por medio de pago, las
+    // ventas sin marcar quedan fuera en vez de caer en un cajón que no es.
+    let ventasQuery = supabase
+      .from("ventas_productos")
+      .select("*, products!inner(name)")
+      .gte("vendido_at", inicioDiaLimaUTC(rango.desde))
+      .lt("vendido_at", finDiaLimaUTC(rango.hasta))
+    if (metodo !== "all") ventasQuery = ventasQuery.eq("metodo_pago", metodo)
     const [prodRes, ventasRes, costosRes] = await Promise.all([
       supabase.from("products").select("*").order("sort_order"),
-      supabase
-        .from("ventas_productos")
-        .select("*, products!inner(name)")
-        .gte("vendido_at", inicioDiaLimaUTC(rango.desde))
-        .lt("vendido_at", finDiaLimaUTC(rango.hasta))
-        .order("vendido_at", { ascending: false }),
+      ventasQuery.order("vendido_at", { ascending: false }),
       supabase.from("costos_producto").select("*"),
     ])
     if (version !== versionCarga.current) return
@@ -169,7 +176,7 @@ export default function Productos({ rango }: { rango: Rango }) {
       setCostos(new Map((costosRes.data as CostoProducto[]).map((c) => [c.producto_id, c])))
     }
     setCargando(false)
-  }, [rango.desde, rango.hasta])
+  }, [rango.desde, rango.hasta, metodo])
 
   // Al cambiar de periodo, la lista de ventas vuelve a su tamaño inicial.
   useEffect(() => setVisibles(25), [rango.desde, rango.hasta])
@@ -228,6 +235,7 @@ export default function Productos({ rango }: { rango: Rango }) {
     setVentaProducto("")
     setVentaCantidad("1")
     setVentaPrecio("")
+    setVentaMetodo(null)
     setVentaNota("")
     setDialogAbierto(true)
   }
@@ -260,6 +268,7 @@ export default function Productos({ rango }: { rango: Rango }) {
     // La policy de venta exige registrado_por = auth.uid() exacto (0018): sin
     // sesión no hay a quién atribuírsela, y un intento igual fallaría en RLS
     // con un error menos legible que este.
+    if (!ventaMetodo) return toast.error("Marca con qué pagó.")
     if (!session?.user.id) return toast.error("Tu sesión expiró — vuelve a iniciar sesión.")
 
     setGuardandoVenta(true)
@@ -267,6 +276,7 @@ export default function Productos({ rango }: { rango: Rango }) {
       producto_id: ventaProducto,
       cantidad,
       precio_unitario: precio,
+      metodo_pago: ventaMetodo,
       nota: ventaNota.trim() || null,
       registrado_por: session.user.id,
     })
@@ -332,6 +342,13 @@ export default function Productos({ rango }: { rango: Rango }) {
 
   return (
     <div className="space-y-5">
+      {metodo !== "all" && (
+        <p className="brand-serif border border-dashed border-border px-4 py-2.5 text-[13px] text-muted-foreground">
+          Ventas cobradas con <span className="text-foreground">{METODO_PAGO_LABEL[metodo]}</span>. El stock y los costos de
+          proveedor son los de siempre: no dependen del medio de pago.
+        </p>
+      )}
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Tile etiqueta="Unidades vendidas" valor={String(unidades)} />
         <Tile etiqueta="Ingresos por productos" valor={formatoSoles(ingresos)} />
@@ -469,6 +486,10 @@ export default function Productos({ rango }: { rango: Rango }) {
                   <span className="tnum font-semibold">{v.cantidad} ×</span> {v.products.name}
                   {v.nota && <span className="brand-serif text-muted-foreground"> · {v.nota}</span>}
                   <span className="brand-serif text-muted-foreground"> · {etiquetaLarga(diaLimaDe(v.vendido_at))}</span>
+                  <span className="brand-serif text-muted-foreground">
+                    {" · "}
+                    {v.metodo_pago ? METODO_PAGO_LABEL[v.metodo_pago as MetodoPago] : "sin marcar"}
+                  </span>
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   <span className="tnum font-semibold">{formatoSoles(v.cantidad * v.precio_unitario)}</span>
@@ -494,47 +515,65 @@ export default function Productos({ rango }: { rango: Rango }) {
         )}
       </Ficha>
 
-      <Dialog open={dialogAbierto} onOpenChange={setDialogAbierto}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="brand-display text-[20px]">Registrar venta</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <Label className="brand-serif">Producto</Label>
-              <select
-                value={ventaProducto}
-                onChange={(e) => elegirProducto(e.target.value)}
-                className="h-9 w-full border border-input bg-card px-3 text-sm outline-none focus:border-foreground"
-              >
-                <option value="">Elegir producto…</option>
-                {activos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} — S/ {p.price} (stock {p.stock})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="brand-serif">Cantidad</Label>
-                <Input type="number" min={1} value={ventaCantidad} onChange={(e) => setVentaCantidad(e.target.value)} className="tnum" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="brand-serif">Precio unitario (S/)</Label>
-                <Input type="number" min={0} step="0.1" value={ventaPrecio} onChange={(e) => setVentaPrecio(e.target.value)} className="tnum" />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="brand-serif">Nota (opcional)</Label>
-              <Input value={ventaNota} onChange={(e) => setVentaNota(e.target.value)} placeholder="Yape, efectivo, cliente…" />
-            </div>
-            <button onClick={registrarVenta} disabled={guardandoVenta} className="chip23 on w-full py-3 text-[13px] disabled:opacity-40">
-              {guardandoVenta ? "Guardando…" : "Registrar venta"}
-            </button>
+      <ModalFicha
+        open={dialogAbierto}
+        onOpenChange={setDialogAbierto}
+        mini="Tienda del estudio"
+        titulo="Registrar venta"
+        ancho="sm:max-w-md"
+        pie={
+          <button onClick={registrarVenta} disabled={guardandoVenta} className="chip23 on disabled:opacity-40">
+            {guardandoVenta ? "Guardando…" : "Registrar venta"}
+          </button>
+        }
+      >
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="brand-serif">Producto</Label>
+            <select
+              value={ventaProducto}
+              onChange={(e) => elegirProducto(e.target.value)}
+              className="h-11 w-full border border-border bg-card px-3 text-sm outline-none focus:border-foreground"
+            >
+              <option value="">Elegir producto…</option>
+              {activos.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} — S/ {p.price} (stock {p.stock})
+                </option>
+              ))}
+            </select>
           </div>
-        </DialogContent>
-      </Dialog>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="brand-serif">Cantidad</Label>
+              <Input type="number" min={1} value={ventaCantidad} onChange={(e) => setVentaCantidad(e.target.value)} className="tnum h-11" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="brand-serif">Precio unitario (S/)</Label>
+              <Input type="number" min={0} step="0.1" value={ventaPrecio} onChange={(e) => setVentaPrecio(e.target.value)} className="tnum h-11" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label className="brand-serif">¿Con qué pagó?</Label>
+            <div className="flex flex-wrap gap-2">
+              {METODOS_PAGO.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setVentaMetodo(m)}
+                  className={cn("chip23", ventaMetodo === m && "on")}
+                >
+                  {METODO_PAGO_LABEL[m]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="brand-serif">Nota (opcional)</Label>
+            <Input value={ventaNota} onChange={(e) => setVentaNota(e.target.value)} placeholder="Para quién, si dejó saldo…" />
+          </div>
+        </div>
+      </ModalFicha>
     </div>
   )
 }

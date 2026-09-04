@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 import { Download, Loader2 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
-import { BARBEROS, type Barbero } from "@/lib/types"
+import { BARBEROS, METODO_PAGO_LABEL, type Barbero } from "@/lib/types"
+import type { FiltroMetodo } from "./index"
 import { GraficoBarrasApiladas, GraficoBarrasH, type DiaBarras } from "./charts"
 import { Ficha, CabeceraFicha, Tile, LeyendaSerie } from "./ui"
 import {
@@ -27,6 +28,7 @@ type CitaFila = {
   inicio_utc: string
   estado: string
   barbero: string | null
+  metodo_pago: string | null
   services: { name: string; price: string }
   clientes: { nombre: string | null; telefono: string }
 }
@@ -50,7 +52,7 @@ function precioNumerico(price: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null
 }
 
-export default function Comisiones({ rango }: { rango: Rango }) {
+export default function Comisiones({ rango, metodo }: { rango: Rango; metodo: FiltroMetodo }) {
   const [citas, setCitas] = useState<CitaFila[]>([])
   const [cargando, setCargando] = useState(true)
   const [asignando, setAsignando] = useState<string | null>(null)
@@ -62,13 +64,17 @@ export default function Comisiones({ rango }: { rango: Rango }) {
     const version = ++versionCarga.current
     // Servicios efectivamente atendidos: confirmadas/completadas y ya pasadas.
     // Canceladas, expiradas y no-asistió no pagan comisión.
-    const { data, error } = await supabase
+    // Con filtro de medio de pago solo entran las citas cobradas así: las que
+    // todavía no lo tienen marcado quedan fuera a propósito (no se sabe cómo
+    // pagaron, y meterlas en "efectivo" sería inventar el arqueo).
+    let consulta = supabase
       .from("citas")
-      .select("id, inicio_utc, estado, barbero, services!inner(name, price), clientes!inner(nombre, telefono)")
+      .select("id, inicio_utc, estado, barbero, metodo_pago, services!inner(name, price), clientes!inner(nombre, telefono)")
       .gte("inicio_utc", inicioDiaLimaUTC(rango.desde))
       .lt("inicio_utc", finDiaLimaUTC(rango.hasta))
       .in("estado", ["confirmada", "completada"])
-      .order("inicio_utc")
+    if (metodo !== "all") consulta = consulta.eq("metodo_pago", metodo)
+    const { data, error } = await consulta.order("inicio_utc")
     if (version !== versionCarga.current) return
     if (error) {
       toast.error("No se pudieron cargar las citas del periodo.")
@@ -88,7 +94,7 @@ export default function Comisiones({ rango }: { rango: Rango }) {
       ),
     )
     setCargando(false)
-  }, [rango.desde, rango.hasta])
+  }, [rango.desde, rango.hasta, metodo])
 
   useEffect(() => {
     setCargando(true)
@@ -193,7 +199,7 @@ export default function Comisiones({ rango }: { rango: Rango }) {
     const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" }))
     const a = document.createElement("a")
     a.href = url
-    a.download = `comisiones-${rango.desde}-a-${rango.hasta}.csv`
+    a.download = `comisiones-${rango.desde}-a-${rango.hasta}${metodo === "all" ? "" : `-${metodo}`}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -208,6 +214,13 @@ export default function Comisiones({ rango }: { rango: Rango }) {
 
   return (
     <div className="space-y-5">
+      {metodo !== "all" && (
+        <p className="brand-serif border border-dashed border-border px-4 py-2.5 text-[13px] text-muted-foreground">
+          Mostrando solo lo cobrado con <span className="text-foreground">{METODO_PAGO_LABEL[metodo]}</span>. Las citas sin
+          medio de pago marcado no entran en este total.
+        </p>
+      )}
+
       {/* Cifras del periodo */}
       <div className="grid gap-3 sm:grid-cols-3">
         <Tile etiqueta="Servicios atendidos" valor={String(totalServicios)} />

@@ -28,11 +28,65 @@ function fechaISO(anio: number, mes: number, dia: number): string {
   return `${anio}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`
 }
 
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"]
+
 function ultimoDiaDelMes(anio: number, mes: number): number {
   return new Date(Date.UTC(anio, mes, 0)).getUTCDate()
 }
 
 export type Rango = { desde: string; hasta: string } // fechas Lima inclusive
+
+/**
+ * El mes de caja del negocio: abre el 16 y cierra el 15 del mes siguiente.
+ * Todo el Control se organiza por estos ciclos, no por el mes calendario —
+ * si no, la quincena del 16 al 30 quedaría partida entre dos cierres.
+ *
+ * `clave` es el día en que abre ("2026-08-16"), que lo identifica sin
+ * ambigüedad; la etiqueta muestra los dos extremos ("16 ago – 15 set")
+ * justamente para que nadie tenga que adivinar a qué mes "pertenece".
+ */
+export type Ciclo = Rango & { clave: string; etiqueta: string; etiquetaCorta: string }
+
+function armarCiclo(anio: number, mes: number): Ciclo {
+  const mesCierre = mes === 12 ? 1 : mes + 1
+  const anioCierre = mes === 12 ? anio + 1 : anio
+  const desde = fechaISO(anio, mes, 16)
+  const hasta = fechaISO(anioCierre, mesCierre, 15)
+  const abre = MESES_CORTOS[mes - 1]
+  const cierra = MESES_CORTOS[mesCierre - 1]
+  return {
+    desde,
+    hasta,
+    clave: desde,
+    etiqueta: `16 ${abre} – 15 ${cierra}${anioCierre !== new Date().getUTCFullYear() ? ` ${anioCierre}` : ""}`,
+    etiquetaCorta: `${abre}–${cierra}`,
+  }
+}
+
+/** El ciclo al que pertenece una fecha Lima. Del 1 al 15 todavía es el ciclo anterior. */
+export function cicloDe(fecha: string): Ciclo {
+  const { anio, mes, dia } = partes(fecha)
+  if (dia >= 16) return armarCiclo(anio, mes)
+  return mes === 1 ? armarCiclo(anio - 1, 12) : armarCiclo(anio, mes - 1)
+}
+
+/** El ciclo abierto hoy. */
+export function cicloActual(): Ciclo {
+  return cicloDe(hoyLima())
+}
+
+/** Mueve `pasos` ciclos hacia atrás (negativo) o adelante (positivo). */
+export function cicloDesplazado(ciclo: Ciclo, pasos: number): Ciclo {
+  const { anio, mes } = partes(ciclo.desde)
+  const total = anio * 12 + (mes - 1) + pasos
+  return armarCiclo(Math.floor(total / 12), (total % 12) + 1)
+}
+
+/** Los últimos `cantidad` ciclos, del más reciente al más viejo. */
+export function ciclosRecientes(cantidad = 12): Ciclo[] {
+  const actual = cicloActual()
+  return Array.from({ length: cantidad }, (_, i) => cicloDesplazado(actual, -i))
+}
 
 export function calcularRango(clave: RangoClave): Rango {
   const hoy = hoyLima()
@@ -87,8 +141,6 @@ export function listarDias(rango: Rango): string[] {
   }
   return dias
 }
-
-const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "set", "oct", "nov", "dic"]
 
 /** "1-Set" — el formato de fecha del Excel del negocio. */
 export function etiquetaCorta(fecha: string): string {

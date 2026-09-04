@@ -126,7 +126,7 @@ export type Testimonial = {
   updated_at: string
 }
 
-export type ProfileRole = "staff" | "alumna" | "superadmin"
+export type ProfileRole = "staff" | "alumna" | "superadmin" | "barbero"
 
 export type Profile = {
   id: string

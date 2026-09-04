@@ -32,6 +32,37 @@ const MENSAJES_ERROR: Record<string, string> = {
   red: "No se pudo conectar con el bot. Revisa que esté en línea.",
 }
 
+/** Igual que post(), pero para consultas de solo lectura al bot. */
+export async function getDisponibilidad(params: {
+  servicio_id: string
+  fecha_desde: string
+  fecha_hasta?: string
+  barbero?: string
+}): Promise<{ fecha: string; horas: string[] }[]> {
+  if (!BASE_URL) throw new BotApiError(MENSAJES_ERROR.sin_configurar, "sin_configurar")
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  if (!token) throw new BotApiError(MENSAJES_ERROR.sin_sesion, "sin_sesion")
+
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v != null) as [string, string][],
+  )
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}/admin/disponibilidad?${query}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+  } catch {
+    throw new BotApiError(MENSAJES_ERROR.red, "red")
+  }
+  if (!res.ok) {
+    const payload = (await res.json().catch(() => null)) as { error?: string } | null
+    const code = payload?.error ?? "desconocido"
+    throw new BotApiError(MENSAJES_ERROR[code] ?? "No se pudo consultar la disponibilidad.", code)
+  }
+  return res.json()
+}
+
 async function post<T>(path: string, body: unknown): Promise<T> {
   if (!BASE_URL) throw new BotApiError(MENSAJES_ERROR.sin_configurar, "sin_configurar")
 
@@ -81,6 +112,29 @@ export function enviarPromocion(params: { clienteIds: string[]; plantilla: strin
  */
 export function actualizarEstadoCita(citaId: string, estado: CitaEstado) {
   return post<{ cita: Cita }>(`/admin/citas/${citaId}/estado`, { estado })
+}
+
+/** Lo que el barbero anota después de atender (el corte, el tono, la máquina). */
+export function guardarAtencion(citaId: string, atencionNotas: string) {
+  return post<{ ok: true }>(`/admin/citas/${citaId}/atencion`, { atencion_notas: atencionNotas })
+}
+
+/** Mover de horario: rehace el evento de Calendar y revalida el hueco. */
+export function reagendarCita(citaId: string, fecha: string, hora: string) {
+  return post<{ cita: Cita }>(`/admin/citas/${citaId}/reagendar`, { fecha, hora })
+}
+
+/** Cita cargada a mano (cliente que llegó sin reservar). Nace confirmada. */
+export function crearCitaManual(datos: {
+  servicio_id: string
+  fecha: string
+  hora: string
+  nombre_cliente: string
+  telefono_cliente: string
+  barbero?: string
+  notas?: string
+}) {
+  return post<{ cita: Cita }>("/admin/citas", datos)
 }
 
 /** Mismo motivo que actualizarEstadoCita: si el bloqueo vino de Calendar, hay que borrar el evento también. */

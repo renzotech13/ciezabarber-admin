@@ -70,6 +70,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
           )}
         </nav>
 
+        <NavLink
+          to="/app"
+          className="brand-wide border-t border-sidebar-border px-5 pb-[13px] pt-[15px] text-[11px] text-sidebar-foreground/70 transition-colors hover:text-sidebar-primary"
+        >
+          Abrir app del celular
+        </NavLink>
+
         <div className="border-t border-sidebar-border px-5 py-4">
           <div className="brand-serif mb-2 truncate text-[12px] text-sidebar-foreground/60">{session?.user.email}</div>
           <button

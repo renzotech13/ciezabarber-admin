@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
 import type { Session } from "@supabase/supabase-js"
 import { supabase } from "./supabase"
-import type { ProfileRole } from "./types"
+import type { Barbero, ProfileRole } from "./types"
 
 type AuthState = {
   session: Session | null
@@ -10,6 +10,12 @@ type AuthState = {
    *  ese caso la app se comporta como staff normal (lo financiero se oculta),
    *  nunca al revés. */
   role: ProfileRole | null
+  /**
+   * Qué silla es suya ('Cieza' | 'Nilton' | 'Bryan'), si le corresponde
+   * alguna. El dueño es superadmin Y barbero: el rol dice qué puede hacer,
+   * esto solo dice cuál es su agenda propia.
+   */
+  barbero: Barbero | null
   /** true mientras el rol de esta sesión todavía se está consultando — las
    *  rutas gated esperan a que termine en vez de rebotar al superadmin que
    *  entra con un enlace directo a /control. */
@@ -24,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [role, setRole] = useState<ProfileRole | null>(null)
+  const [barbero, setBarbero] = useState<Barbero | null>(null)
   const [roleCargando, setRoleCargando] = useState(false)
 
   useEffect(() => {
@@ -41,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!userId) {
       setRole(null)
+      setBarbero(null)
       setRoleCargando(false)
       return
     }
@@ -48,12 +56,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRoleCargando(true)
     supabase
       .from("profiles")
-      .select("role")
+      .select("role, barbero")
       .eq("id", userId)
       .maybeSingle()
       .then(({ data }) => {
         if (!activo) return
         setRole((data?.role as ProfileRole | undefined) ?? null)
+        setBarbero((data?.barbero as Barbero | undefined) ?? null)
         setRoleCargando(false)
       })
     return () => {
@@ -71,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, loading, role, roleCargando, signIn, signOut }}>
+    <AuthContext.Provider value={{ session, loading, role, barbero, roleCargando, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   )

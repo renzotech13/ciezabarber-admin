@@ -45,7 +45,7 @@ function precioNumerico(price: string): number | null {
  * (servicios atendidos + productos vendidos), para tener contra qué comparar.
  *
  * Ojo con lo que ese total significa: incluye TODO lo cobrado, no solo el
- * efectivo — los adelantos entran por Yape y muchas ventas también. Por eso
+ * efectivo — los pagos de reservas entran por Yape y muchas ventas también. Por eso
  * la diferencia al cerrar no es un descuadre, es sobre todo lo que no pasó
  * por la caja; el campo de nota está para dejar constancia de eso.
  */

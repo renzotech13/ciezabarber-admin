@@ -2,19 +2,12 @@ import { useEffect, useState, type FormEvent } from "react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { BOOKING_GROUPS, type Service, type ServiceCategory } from "@/lib/types"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { ModalFicha } from "@/components/ModalFicha"
 
 function slugify(text: string) {
   return text
@@ -98,76 +91,90 @@ export default function ServiceFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Editar servicio" : "Nuevo servicio"}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="svc-name">Nombre</Label>
-            <Input id="svc-name" required value={name} onChange={(e) => setName(e.target.value)} />
+    <ModalFicha
+      open={open}
+      onOpenChange={onOpenChange}
+      mini={isEdit ? service!.name : "Carta de servicios"}
+      titulo={isEdit ? "Editar servicio" : "Nuevo servicio"}
+      ancho="sm:max-w-lg"
+      pie={
+        <button
+          type="submit"
+          form="svc-form"
+          disabled={submitting || !categoryId}
+          className="chip23 on disabled:opacity-40"
+        >
+          {submitting ? "Guardando…" : "Guardar"}
+        </button>
+      }
+    >
+      <form id="svc-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="svc-name" className="brand-serif">Nombre</Label>
+          <Input id="svc-name" required value={name} onChange={(e) => setName(e.target.value)} placeholder="Corte clásico" />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="svc-id" className="brand-serif">Id (slug)</Label>
+          <Input
+            id="svc-id"
+            required
+            disabled={isEdit}
+            value={isEdit ? service!.id : id || slugify(name)}
+            onChange={(e) => setId(e.target.value)}
+            placeholder="corte-basico"
+          />
+          {isEdit && (
+            <p className="brand-serif text-[12px] text-muted-foreground">
+              No se puede cambiar: ya se usa en reservas existentes.
+            </p>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label className="brand-serif">Categoría</Label>
+            <Select value={categoryId} onValueChange={(v) => setCategoryId(v as string)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Elegir categoría" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.icon} {c.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="svc-id">Id (slug)</Label>
-            <Input
-              id="svc-id"
-              required
-              disabled={isEdit}
-              value={isEdit ? service!.id : id || slugify(name)}
-              onChange={(e) => setId(e.target.value)}
-              placeholder="microblading"
-            />
-            {isEdit && (
-              <p className="text-xs text-muted-foreground">
-                No se puede cambiar: ya se usa en reservas existentes.
-              </p>
-            )}
+          <div className="flex flex-col gap-1.5">
+            <Label className="brand-serif">Grupo de reserva</Label>
+            <Select value={bookingGroup} onValueChange={(v) => setBookingGroup(v as typeof bookingGroup)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {BOOKING_GROUPS.map((g) => (
+                  <SelectItem key={g} value={g}>
+                    {g}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-2">
-              <Label>Categoría</Label>
-              <Select value={categoryId} onValueChange={(v) => setCategoryId(v as string)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Elegir categoría" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.icon} {c.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>Grupo de reserva</Label>
-              <Select value={bookingGroup} onValueChange={(v) => setBookingGroup(v as typeof bookingGroup)}>
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {BOOKING_GROUPS.map((g) => (
-                    <SelectItem key={g} value={g}>
-                      {g}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="svc-duration" className="brand-serif">Duración</Label>
+            <Input id="svc-duration" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="45min" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="svc-duration">Duración</Label>
-              <Input id="svc-duration" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="2h o —" />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="svc-price">Precio</Label>
-              <Input id="svc-price" required value={price} onChange={(e) => setPrice(e.target.value)} placeholder="250 o 15–40" />
-            </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="svc-price" className="brand-serif">Precio (S/)</Label>
+            <Input id="svc-price" required value={price} onChange={(e) => setPrice(e.target.value)} placeholder="40" className="tnum" />
           </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="svc-deposit">Adelanto requerido (S/, opcional)</Label>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="svc-deposit" className="brand-serif">Pago fijo (S/)</Label>
             <Input
               id="svc-deposit"
               type="number"
@@ -175,24 +182,32 @@ export default function ServiceFormDialog({
               min="0"
               value={depositAmount}
               onChange={(e) => setDepositAmount(e.target.value)}
-              placeholder="Sin definir"
+              placeholder="Precio"
+              className="tnum"
             />
           </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="svc-desc">Descripción</Label>
-            <Textarea id="svc-desc" required value={description} onChange={(e) => setDescription(e.target.value)} />
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch id="svc-active" checked={active} onCheckedChange={setActive} />
-            <Label htmlFor="svc-active">Activo (visible en el sitio)</Label>
-          </div>
-          <DialogFooter>
-            <Button type="submit" disabled={submitting || !categoryId}>
-              {submitting ? "Guardando…" : "Guardar"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        </div>
+        <p className="brand-serif -mt-2 text-[12px] text-muted-foreground">
+          Se cobra el servicio completo por adelantado. Llena “pago fijo” solo si este servicio se
+          cobra distinto al precio de la carta.
+        </p>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="svc-desc" className="brand-serif">Descripción (opcional)</Label>
+          <Textarea
+            id="svc-desc"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Máquina y tijera, lavado y peinado."
+            rows={2}
+          />
+        </div>
+
+        <label className="flex items-center gap-2.5 border border-border px-3 py-2.5">
+          <Switch id="svc-active" checked={active} onCheckedChange={setActive} />
+          <span className="brand-serif text-[13px]">Activo (visible en el sitio)</span>
+        </label>
+      </form>
+    </ModalFicha>
   )
 }

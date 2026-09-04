@@ -2,19 +2,12 @@ import { useEffect, useState, type FormEvent } from "react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import type { ServiceCategory } from "@/lib/types"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { ImagePicker } from "@/components/ImagePicker"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { ModalFicha } from "@/components/ModalFicha"
 
 function slugify(text: string) {
   return text
@@ -86,59 +79,71 @@ export default function CategoryFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Editar categoría" : "Nueva categoría"}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="cat-icon">Ícono</Label>
-              <Input id="cat-icon" required value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="✎" />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="cat-id">Id (slug)</Label>
-              <Input
-                id="cat-id"
-                required
-                disabled={isEdit}
-                value={isEdit ? category!.id : id || slugify(title)}
-                onChange={(e) => setId(e.target.value)}
-                placeholder="cejas"
-              />
-            </div>
+    <ModalFicha
+      open={open}
+      onOpenChange={onOpenChange}
+      mini={isEdit ? category!.title : "Carta de servicios"}
+      titulo={isEdit ? "Editar categoría" : "Nueva categoría"}
+      ancho="sm:max-w-lg"
+      pie={
+        <button type="submit" form="cat-form" disabled={submitting} className="chip23 on disabled:opacity-40">
+          {submitting ? "Guardando…" : "Guardar"}
+        </button>
+      }
+    >
+      <form id="cat-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <div className="grid grid-cols-[80px_1fr] gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="cat-icon" className="brand-serif">Ícono</Label>
+            <Input id="cat-icon" required value={icon} onChange={(e) => setIcon(e.target.value)} placeholder="✂" />
           </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="cat-title">Título</Label>
-            <Input id="cat-title" required value={title} onChange={(e) => setTitle(e.target.value)} />
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="cat-id" className="brand-serif">Id (slug)</Label>
+            <Input
+              id="cat-id"
+              required
+              disabled={isEdit}
+              value={isEdit ? category!.id : id || slugify(title)}
+              onChange={(e) => setId(e.target.value)}
+              placeholder="cortes"
+            />
           </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="cat-desc">Descripción</Label>
-            <Textarea id="cat-desc" required value={description} onChange={(e) => setDescription(e.target.value)} />
-          </div>
-          <div className="flex flex-col gap-4">
-            <Label>Imágenes (hasta 3)</Label>
-            {images.map((img, i) => (
-              <ImagePicker
-                key={i}
-                label={`Imagen ${i + 1}`}
-                value={img || null}
-                onChange={(url) => setImages((prev) => prev.map((v, idx) => (idx === i ? url ?? "" : v)))}
-              />
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch id="cat-active" checked={active} onCheckedChange={setActive} />
-            <Label htmlFor="cat-active">Activa (visible en el sitio)</Label>
-          </div>
-          <DialogFooter>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? "Guardando…" : "Guardar"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="cat-title" className="brand-serif">Título</Label>
+          <Input id="cat-title" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Cortes" />
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="cat-desc" className="brand-serif">Descripción</Label>
+          <Textarea
+            id="cat-desc"
+            required
+            rows={2}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Cortes clásicos y fades, con acabado a navaja."
+          />
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <Label className="brand-serif">Imágenes (hasta 3)</Label>
+          {images.map((img, i) => (
+            <ImagePicker
+              key={i}
+              label={`Imagen ${i + 1}`}
+              value={img || null}
+              onChange={(url) => setImages((prev) => prev.map((v, idx) => (idx === i ? url ?? "" : v)))}
+            />
+          ))}
+        </div>
+
+        <label className="flex items-center gap-2.5 border border-border px-3 py-2.5">
+          <Switch id="cat-active" checked={active} onCheckedChange={setActive} />
+          <span className="brand-serif text-[13px]">Activa (visible en el sitio)</span>
+        </label>
+      </form>
+    </ModalFicha>
   )
 }

@@ -54,11 +54,11 @@ type CitaConDetalle = Cita & {
 }
 
 // "expirada" no está en el menú de cambio de estado: la pone el bot al
-// liberar un horario sin adelanto, no es algo que el staff marque a mano.
+// liberar un horario sin pago, no es algo que el staff marque a mano.
 const ESTADO_ORDER: CitaEstado[] = ["confirmada", "completada", "no_asistio", "cancelada"]
 const FILTROS: { key: "all" | CitaEstado; label: string; icon: LucideIcon }[] = [
   { key: "all", label: "Todas", icon: LayoutList },
-  { key: "pendiente_pago", label: "Esperando adelanto", icon: Wallet },
+  { key: "pendiente_pago", label: "Esperando pago", icon: Wallet },
   { key: "confirmada", label: "Confirmadas", icon: CalendarCheck2 },
   { key: "completada", label: "Completadas", icon: CheckCheck },
   { key: "no_asistio", label: "No asistió", icon: UserX },

@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import { CalendarPlus, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { getDisponibilidad, crearCitaManual, BotApiError } from "@/lib/botApi"
 import { BARBEROS, type Barbero } from "@/lib/types"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
+import { ModalFicha } from "@/components/ModalFicha"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
@@ -42,7 +41,7 @@ function normalizarTelefono(raw: string): string {
  * Cita cargada a mano desde recepción: el cliente que llegó sin reservar.
  * Pasa por el bot (no un insert directo) para que valide el hueco contra la
  * agenda de esa silla y cree el evento de Calendar. Nace confirmada y sin
- * adelanto — el cliente ya está en el local.
+ * pago por adelantado — el cliente ya está en el local.
  */
 export default function NuevaCitaDialog({
   open,
@@ -130,121 +129,130 @@ export default function NuevaCitaDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CalendarPlus className="size-4" />
-            Nueva cita
-          </DialogTitle>
-        </DialogHeader>
+    <ModalFicha
+      open={open}
+      onOpenChange={onOpenChange}
+      mini="Cliente que llegó sin reservar"
+      titulo="Nueva cita"
+      ancho="sm:max-w-xl"
+    >
+      <div className="space-y-5">
+        <div className="space-y-1.5">
+          <Label className="brand-serif">Servicio</Label>
+          <select
+            value={servicioId}
+            onChange={(e) => setServicioId(e.target.value)}
+            className="h-11 w-full rounded-none border border-border bg-card px-3 text-sm outline-none focus:border-foreground"
+          >
+            <option value="">Elegir servicio…</option>
+            {servicios.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} · {s.duration} · S/ {s.price}
+              </option>
+            ))}
+          </select>
+        </div>
 
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label>Servicio</Label>
-            <select
-              value={servicioId}
-              onChange={(e) => setServicioId(e.target.value)}
-              className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus:border-ring"
-            >
-              <option value="">Elegir servicio…</option>
-              {servicios.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} · {s.duration} · S/ {s.price}
-                </option>
-              ))}
-            </select>
+            <Label className="brand-serif">Cliente</Label>
+            <Input
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Nombre y apellido"
+              className="h-11 rounded-none"
+            />
           </div>
-
           <div className="space-y-1.5">
-            <Label>Barbero</Label>
-            <div className="flex flex-wrap gap-2">
-              {BARBEROS.map((b) => (
-                <Button
-                  key={b}
-                  type="button"
-                  size="sm"
-                  variant={barbero === b ? "default" : "outline"}
-                  onClick={() => setBarbero(barbero === b ? "" : b)}
-                >
-                  {b}
-                </Button>
-              ))}
-            </div>
-            {!barbero && (
-              <p className="text-xs text-muted-foreground">
-                Sin elegir, se muestran los horarios libres de cualquier silla.
-              </p>
-            )}
+            <Label className="brand-serif">WhatsApp</Label>
+            <Input
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+              inputMode="numeric"
+              placeholder="987 654 321"
+              className="tnum h-11 rounded-none"
+            />
           </div>
+        </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Cliente</Label>
-              <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>WhatsApp</Label>
-              <Input
-                value={telefono}
-                onChange={(e) => setTelefono(e.target.value)}
-                inputMode="numeric"
-                placeholder="987 654 321"
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {dias.map((d) => (
-              <Button
-                key={d}
+        <div className="space-y-2">
+          <Label className="brand-serif">Barbero</Label>
+          <div className="flex flex-wrap gap-2">
+            {BARBEROS.map((b) => (
+              <button
+                key={b}
                 type="button"
-                size="sm"
-                variant={fecha === d ? "default" : "outline"}
-                onClick={() => setFecha(d)}
-                className="shrink-0 capitalize"
+                onClick={() => setBarbero(barbero === b ? "" : b)}
+                className={cn("chip23", barbero === b && "on")}
               >
-                {etiquetaDia(d)}
-              </Button>
+                {b}
+              </button>
             ))}
           </div>
-
-          {!servicioId ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              Elige un servicio para ver los horarios libres.
-            </p>
-          ) : buscando ? (
-            <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> Buscando horarios…
-            </div>
-          ) : horas.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              No hay horarios libres ese día{barbero ? ` para ${barbero}` : ""}.
-            </p>
-          ) : (
-            <div className="grid grid-cols-4 gap-2">
-              {horas.map((h) => (
-                <Button
-                  key={h}
-                  type="button"
-                  variant="outline"
-                  disabled={!listo || guardando != null}
-                  onClick={() => crear(h)}
-                  className={cn("tabular-nums", guardando === h && "opacity-60")}
-                >
-                  {guardando === h ? <Loader2 className="size-4 animate-spin" /> : h}
-                </Button>
-              ))}
-            </div>
-          )}
-
-          {servicioId && horas.length > 0 && !listo && (
-            <p className="text-center text-xs text-muted-foreground">
-              Completa nombre y WhatsApp del cliente para poder agendar.
+          {!barbero && (
+            <p className="brand-serif text-[12px] text-muted-foreground">
+              Sin elegir, se muestran los horarios libres de cualquier silla.
             </p>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+
+        <div className="space-y-2">
+          <Label className="brand-serif">Día</Label>
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+            {dias.map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => setFecha(d)}
+                className={cn("chip23 shrink-0 whitespace-nowrap", fecha === d && "on")}
+              >
+                {etiquetaDia(d)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="border-t border-border pt-4">
+          <div className="brand-wide mb-3 text-[10px] text-muted-foreground">Horarios libres</div>
+          {!servicioId ? (
+            <p className="brand-serif py-6 text-center text-[13px] text-muted-foreground">
+              Elige un servicio para ver los horarios libres.
+            </p>
+          ) : buscando ? (
+            <div className="brand-serif flex items-center justify-center gap-2 py-6 text-[13px] text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" /> Buscando horarios…
+            </div>
+          ) : horas.length === 0 ? (
+            <p className="brand-serif py-6 text-center text-[13px] text-muted-foreground">
+              No hay horarios libres ese día{barbero ? ` para ${barbero}` : ""}.
+            </p>
+          ) : (
+            <>
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+                {horas.map((h) => (
+                  <button
+                    key={h}
+                    type="button"
+                    disabled={!listo || guardando != null}
+                    onClick={() => crear(h)}
+                    className={cn(
+                      "chip23 tnum flex items-center justify-center py-3 disabled:opacity-35",
+                      guardando === h && "on",
+                    )}
+                  >
+                    {guardando === h ? <Loader2 className="size-3.5 animate-spin" /> : h}
+                  </button>
+                ))}
+              </div>
+              <p className="brand-serif mt-3 text-center text-[12px] text-muted-foreground">
+                {listo
+                  ? "Toca la hora y la cita queda creada y confirmada."
+                  : "Completa nombre y WhatsApp del cliente para poder agendar."}
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    </ModalFicha>
   )
 }

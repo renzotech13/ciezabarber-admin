@@ -132,7 +132,7 @@ export default function ServicesPanel() {
                   <TableHead>Categoría</TableHead>
                   <TableHead>Duración</TableHead>
                   <TableHead>Precio</TableHead>
-                  <TableHead>Adelanto</TableHead>
+                  <TableHead>Pago</TableHead>
                   <TableHead>Activo</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>

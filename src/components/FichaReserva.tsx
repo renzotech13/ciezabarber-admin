@@ -17,7 +17,7 @@ const ORIGEN_LABEL = { whatsapp: "por WhatsApp", web: "desde la web" } as const
 
 /**
  * Todo lo que el staff necesita de una reserva sin salir de la tabla: la
- * constancia del adelanto, la ficha del cliente y qué se le hizo las veces
+ * constancia del pago, la ficha del cliente y qué se le hizo las veces
  * anteriores. El "historial clínico" de la barbería: antes de atender, el
  * barbero abre la fila y ve el corte de la última vez y sus preferencias.
  */
@@ -115,16 +115,16 @@ export default function FichaReserva({ cita }: { cita: Cita & { clientes: { nomb
 
   return (
     <div className="grid gap-6 px-4 py-5 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)_minmax(0,1fr)]">
-      {/* --- comprobante del adelanto --- */}
+      {/* --- comprobante del pago --- */}
       <section className="min-w-0 space-y-2">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Adelanto</h4>
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pago</h4>
         {cita.comprobante_path ? (
           <>
             {comprobanteUrl && !comprobanteRoto ? (
               <a href={comprobanteUrl} target="_blank" rel="noreferrer" title="Abrir en tamaño completo">
                 <img
                   src={comprobanteUrl}
-                  alt="Constancia del adelanto"
+                  alt="Constancia del pago"
                   onError={() => setComprobanteRoto(true)}
                   className="max-h-72 w-full rounded-md border border-border bg-muted object-contain"
                 />

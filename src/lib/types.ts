@@ -237,16 +237,16 @@ export type CitaEstado =
   | "expirada"
 
 // "pendiente_pago" = el horario está apartado pero la cita NO está agendada:
-// se está esperando la captura del adelanto. "expirada" = ese plazo venció y
+// se está esperando la captura del pago. "expirada" = ese plazo venció y
 // el bot liberó el horario solo (distinto de "cancelada", que es alguien
 // echándose atrás a propósito).
 export const CITA_ESTADO_LABEL: Record<CitaEstado, string> = {
-  pendiente_pago: "Esperando adelanto",
+  pendiente_pago: "Esperando pago",
   confirmada: "Confirmada",
   cancelada: "Cancelada",
   completada: "Completada",
   no_asistio: "No asistió",
-  expirada: "Liberada sin adelanto",
+  expirada: "Liberada sin pago",
 }
 
 export type ComprobanteEstado = "sin_comprobante" | "confirmado" | "en_revision"

@@ -42,7 +42,7 @@ function normalizarTelefono(raw: string): string {
 /**
  * Cita cargada a mano: el cliente que llegó sin reservar, o que coordinó
  * directo con el barbero. Nace confirmada (el cliente ya está ahí), sin
- * adelanto — el bot se encarga de eso y del evento de Calendar.
+ * pago por adelantado — el bot se encarga de eso y del evento de Calendar.
  */
 export default function NuevaCita({ onCerrar, onCreada }: { onCerrar: () => void; onCreada: () => Promise<void> | void }) {
   const { role, barbero } = useAuth()

@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Cita, CitaEstado, MetodoPago, Mensaje } from "./types"
+import type { Barbero, Cita, CitaEstado, MetodoPago, Mensaje } from "./types"
 
 const BASE_URL = import.meta.env.VITE_BOT_API_URL as string | undefined
 
@@ -138,6 +138,23 @@ export function crearCitaManual(datos: {
   notas?: string
 }) {
   return post<{ cita: Cita }>("/admin/citas", datos)
+}
+
+/**
+ * Servicio ya atendido (el cliente que llegó sin reserva). Nace completada y
+ * con su medio de pago: entra directo al libro de comisiones y a la caja.
+ */
+export function registrarServicioAtendido(datos: {
+  servicio_id: string
+  barbero: Barbero
+  metodo_pago: MetodoPago
+  fecha: string
+  hora: string
+  nombre_cliente?: string
+  telefono_cliente?: string
+  notas?: string
+}) {
+  return post<{ cita: Cita }>("/admin/citas/atendida", datos)
 }
 
 /** Mismo motivo que actualizarEstadoCita: si el bloqueo vino de Calendar, hay que borrar el evento también. */

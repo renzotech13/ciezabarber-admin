@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { Download, Loader2 } from "lucide-react"
+import { Download, Loader2, Plus } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { BARBEROS, METODO_PAGO_LABEL, type Barbero } from "@/lib/types"
 import type { FiltroMetodo } from "./index"
+import RegistrarServicioDialog from "./RegistrarServicioDialog"
 import { GraficoBarrasApiladas, GraficoBarrasH, type DiaBarras } from "./charts"
 import { Ficha, CabeceraFicha, Tile, LeyendaSerie } from "./ui"
 import {
@@ -13,6 +14,17 @@ import {
 
 /** Regla del negocio (la misma del Excel: "BRAYAN50%, NILTON50%…"). */
 const COMISION_PCT = 0.5
+
+/**
+ * Cieza es el dueño: lo que atiende no es comisión, es ingreso del negocio,
+ * y le queda entero. Los demás cobran su 50%.
+ */
+const DUENO = "Cieza"
+const esDueno = (barbero: string) => barbero === DUENO
+/** Qué proporción de lo cobrado le corresponde a quien atendió. */
+const parteDe = (barbero: string) => (esDueno(barbero) ? 1 : COMISION_PCT)
+/** Encabezado de la columna de plata: "Cieza ingreso" / "Nilton 50%". */
+const etiquetaParte = (barbero: string) => (esDueno(barbero) ? `${barbero} ingreso` : `${barbero} 50%`)
 
 /** Mismos colores que --chart-1/2/3 de index.css — orden fijo por barbero. */
 const COLOR_BARBERO: Record<string, string> = {
@@ -56,6 +68,7 @@ export default function Comisiones({ rango, metodo }: { rango: Rango; metodo: Fi
   const [citas, setCitas] = useState<CitaFila[]>([])
   const [cargando, setCargando] = useState(true)
   const [asignando, setAsignando] = useState<string | null>(null)
+  const [registrando, setRegistrando] = useState(false)
   // Solo la última carga lanzada puede escribir estado: sin esto, cambiar de
   // rango rápido deja que una respuesta lenta y vieja pise a la nueva.
   const versionCarga = useRef(0)
@@ -144,7 +157,13 @@ export default function Comisiones({ rango, metodo }: { rango: Rango; metodo: Fi
 
   const totalServicios = citas.length
   const totalIngresos = [...totalPorBarbero.values()].reduce((s, c) => s + c.monto, 0)
-  const totalPago = totalIngresos * COMISION_PCT
+  // Dos bolsas distintas: lo que hay que PAGARLE a los barberos y lo que le
+  // queda al dueño. Sumarlas en un solo "total a pagar" era engañoso desde que
+  // Cieza percibe el 100% de lo suyo.
+  const totalComisiones = [...totalPorBarbero.entries()]
+    .filter(([b]) => !esDueno(b))
+    .reduce((s, [, c]) => s + c.monto * COMISION_PCT, 0)
+  const ingresoDueno = (totalPorBarbero.get(DUENO)?.monto ?? 0)
 
   const diasGrafico: DiaBarras[] = dias.map((d) => ({
     etiqueta: etiquetaCorta(d),
@@ -178,22 +197,22 @@ export default function Comisiones({ rango, metodo }: { rango: Rango; metodo: Fi
       "Fecha",
       ...columnas,
       "Total servicios",
-      ...columnas.map((b) => `${b} ${COMISION_PCT * 100}%`),
-      "Total pago",
+      ...columnas.map((b) => (esDueno(b) ? `${b} ingreso 100%` : `${b} ${COMISION_PCT * 100}%`)),
+      "Total repartido",
     ]
     const filas = dias.map((d) => {
       const fila = porDia.get(d)
       const conteos = columnas.map((b) => fila?.get(b)?.servicios ?? 0)
-      const pagos = columnas.map((b) => ((fila?.get(b)?.monto ?? 0) * COMISION_PCT).toFixed(2))
-      const totalDia = columnas.reduce((s, b) => s + (fila?.get(b)?.monto ?? 0), 0)
-      return [etiquetaCorta(d), ...conteos, conteos.reduce((a, b) => a + b, 0), ...pagos, (totalDia * COMISION_PCT).toFixed(2)]
+      const pagos = columnas.map((b) => ((fila?.get(b)?.monto ?? 0) * parteDe(b)).toFixed(2))
+      const totalDia = columnas.reduce((s, b) => s + (fila?.get(b)?.monto ?? 0) * parteDe(b), 0)
+      return [etiquetaCorta(d), ...conteos, conteos.reduce((a, b) => a + b, 0), ...pagos, totalDia.toFixed(2)]
     })
     const totales = [
       "TOTAL",
       ...columnas.map((b) => totalPorBarbero.get(b)?.servicios ?? 0),
       totalServicios,
-      ...columnas.map((b) => ((totalPorBarbero.get(b)?.monto ?? 0) * COMISION_PCT).toFixed(2)),
-      totalPago.toFixed(2),
+      ...columnas.map((b) => ((totalPorBarbero.get(b)?.monto ?? 0) * parteDe(b)).toFixed(2)),
+      (totalComisiones + ingresoDueno).toFixed(2),
     ]
     const csv = [cab, ...filas, totales].map((f) => f.join(",")).join("\n")
     const url = URL.createObjectURL(new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" }))
@@ -214,6 +233,8 @@ export default function Comisiones({ rango, metodo }: { rango: Rango; metodo: Fi
 
   return (
     <div className="space-y-5">
+      <RegistrarServicioDialog open={registrando} onOpenChange={setRegistrando} onRegistrado={cargar} />
+
       {metodo !== "all" && (
         <p className="brand-serif border border-dashed border-border px-4 py-2.5 text-[13px] text-muted-foreground">
           Mostrando solo lo cobrado con <span className="text-foreground">{METODO_PAGO_LABEL[metodo]}</span>. Las citas sin
@@ -222,10 +243,11 @@ export default function Comisiones({ rango, metodo }: { rango: Rango; metodo: Fi
       )}
 
       {/* Cifras del periodo */}
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Tile etiqueta="Servicios atendidos" valor={String(totalServicios)} />
         <Tile etiqueta="Ingresos por servicios" valor={formatoSoles(totalIngresos)} />
-        <Tile etiqueta="Total a pagar (50%)" valor={formatoSoles(totalPago)} />
+        <Tile etiqueta="A pagar a barberos" valor={formatoSoles(totalComisiones)} detalle="50% de lo suyo" />
+        <Tile etiqueta={`Ingreso de ${DUENO}`} valor={formatoSoles(ingresoDueno)} detalle="100%, es el dueño" />
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
         {BARBEROS.map((b) => {
@@ -234,8 +256,8 @@ export default function Comisiones({ rango, metodo }: { rango: Rango; metodo: Fi
             <Tile
               key={b}
               marca={colorDe(b)}
-              etiqueta={b}
-              valor={formatoSoles((t?.monto ?? 0) * COMISION_PCT)}
+              etiqueta={esDueno(b) ? `${b} (ingreso)` : b}
+              valor={formatoSoles((t?.monto ?? 0) * parteDe(b))}
               detalle={`${t?.servicios ?? 0} servicio${(t?.servicios ?? 0) === 1 ? "" : "s"}`}
             />
           )
@@ -255,15 +277,17 @@ export default function Comisiones({ rango, metodo }: { rango: Rango; metodo: Fi
         </Ficha>
 
         <Ficha>
-          <CabeceraFicha mini="Comisión del periodo" titulo="Pago por barbero" />
+          <CabeceraFicha mini="Comisión del periodo" titulo="Pago por barbero" extra={
+            <span className="brand-serif text-[12px] text-muted-foreground">{DUENO} al 100%</span>
+          } />
           <div className="px-5 py-4">
             <GraficoBarrasH
               items={BARBEROS.map((b) => {
                 const t = totalPorBarbero.get(b)
                 return {
-                  etiqueta: b,
-                  valor: (t?.monto ?? 0) * COMISION_PCT,
-                  textoValor: formatoSoles((t?.monto ?? 0) * COMISION_PCT),
+                  etiqueta: esDueno(b) ? `${b} (100%)` : b,
+                  valor: (t?.monto ?? 0) * parteDe(b),
+                  textoValor: formatoSoles((t?.monto ?? 0) * parteDe(b)),
                   color: colorDe(b),
                   sub: `${t?.servicios ?? 0} serv.`,
                 }
@@ -279,9 +303,14 @@ export default function Comisiones({ rango, metodo }: { rango: Rango; metodo: Fi
           mini="Réplica del cuaderno de pagos"
           titulo="Libro de comisiones"
           extra={
-            <button onClick={exportarCSV} className="chip23 inline-flex items-center gap-1.5">
-              <Download className="size-3" /> Exportar CSV
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => setRegistrando(true)} className="chip23 on inline-flex items-center gap-1.5">
+                <Plus className="size-3" /> Registrar servicio
+              </button>
+              <button onClick={exportarCSV} className="chip23 inline-flex items-center gap-1.5">
+                <Download className="size-3" /> Exportar CSV
+              </button>
+            </div>
           }
         />
         <div className="overflow-x-auto">
@@ -298,17 +327,17 @@ export default function Comisiones({ rango, metodo }: { rango: Rango; metodo: Fi
                 <th className="brand-wide border-l border-border px-3 py-2.5 text-right text-[10px]">Total serv.</th>
                 {columnas.map((b) => (
                   <th key={`p-${b}`} className="brand-wide px-3 py-2.5 text-right text-[10px] text-muted-foreground">
-                    {b} 50%
+                    {etiquetaParte(b)}
                   </th>
                 ))}
-                <th className="brand-wide border-l border-border px-4 py-2.5 text-right text-[10px]">Total pago</th>
+                <th className="brand-wide border-l border-border px-4 py-2.5 text-right text-[10px]">Total repartido</th>
               </tr>
             </thead>
             <tbody>
               {dias.map((d) => {
                 const fila = porDia.get(d)
                 const totalDiaServ = columnas.reduce((s, b) => s + (fila?.get(b)?.servicios ?? 0), 0)
-                const totalDiaPago = columnas.reduce((s, b) => s + (fila?.get(b)?.monto ?? 0), 0) * COMISION_PCT
+                const totalDiaPago = columnas.reduce((s, b) => s + (fila?.get(b)?.monto ?? 0) * parteDe(b), 0)
                 return (
                   <tr key={d} className={totalDiaServ === 0 ? "border-b border-border/60 text-muted-foreground/50" : "border-b border-border/60"}>
                     <td className="tnum whitespace-nowrap px-4 py-2">{etiquetaCorta(d)}</td>
@@ -320,7 +349,7 @@ export default function Comisiones({ rango, metodo }: { rango: Rango; metodo: Fi
                       const celda = fila?.get(b)
                       return (
                         <td key={`p-${b}`} className="tnum px-3 py-2 text-right">
-                          {formatoSoles((celda?.monto ?? 0) * COMISION_PCT)}
+                          {formatoSoles((celda?.monto ?? 0) * parteDe(b))}
                           {(celda?.sinPrecio ?? 0) > 0 && <span className="text-status-pending">*</span>}
                         </td>
                       )
@@ -340,14 +369,19 @@ export default function Comisiones({ rango, metodo }: { rango: Rango; metodo: Fi
                 <td className="tnum border-l border-background/25 px-3 py-2.5 text-right font-bold">{totalServicios}</td>
                 {columnas.map((b) => (
                   <td key={`p-${b}`} className="tnum px-3 py-2.5 text-right font-semibold">
-                    {formatoSoles((totalPorBarbero.get(b)?.monto ?? 0) * COMISION_PCT)}
+                    {formatoSoles((totalPorBarbero.get(b)?.monto ?? 0) * parteDe(b))}
                   </td>
                 ))}
-                <td className="tnum border-l border-background/25 px-4 py-2.5 text-right font-bold">{formatoSoles(totalPago)}</td>
+                <td className="tnum border-l border-background/25 px-4 py-2.5 text-right font-bold">
+                  {formatoSoles(totalComisiones + ingresoDueno)}
+                </td>
               </tr>
             </tfoot>
           </table>
         </div>
+        <p className="brand-serif border-t border-border px-4 py-2.5 text-[12px] text-muted-foreground">
+          {DUENO} percibe el 100% de lo que atiende (es el dueño); {BARBEROS.filter((b) => !esDueno(b)).join(" y ")}, el 50%.
+        </p>
         {sinPrecioTotal > 0 && (
           <p className="brand-serif border-t border-border px-4 py-2.5 text-[12px] text-muted-foreground">
             * {sinPrecioTotal} servicio{sinPrecioTotal === 1 ? "" : "s"} sin precio numérico claro ("Consultar", rangos) cuentan en el

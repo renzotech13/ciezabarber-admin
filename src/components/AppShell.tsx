@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import { NavLink } from "react-router-dom"
 import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
+import { NuevaReservaWatcher } from "@/components/NuevaReservaWatcher"
 
 const NAV_ITEMS = [
   { to: "/reservas", label: "Reservas" },
@@ -22,6 +23,9 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-svh bg-background">
+      {/* Sin salida visual propia: vive acá para verse desde cualquier
+          página del panel, no solo Reservas. */}
+      <NuevaReservaWatcher />
       <aside className="flex w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground">
         <div className="border-b border-sidebar-border px-5 pb-5 pt-6">
           <div className="brand-display text-[22px] leading-[0.94] text-sidebar-primary">

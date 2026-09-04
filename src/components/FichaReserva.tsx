@@ -116,7 +116,7 @@ export default function FichaReserva({ cita }: { cita: Cita & { clientes: { nomb
   return (
     <div className="grid gap-6 px-4 py-5 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)_minmax(0,1fr)]">
       {/* --- comprobante del adelanto --- */}
-      <section className="space-y-2">
+      <section className="min-w-0 space-y-2">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Adelanto</h4>
         {cita.comprobante_path ? (
           <>
@@ -148,7 +148,9 @@ export default function FichaReserva({ cita }: { cita: Cita & { clientes: { nomb
                 {cita.deposito_esperado != null && `Esperado S/ ${cita.deposito_esperado}`}
                 {cita.comprobante_origen && ` · Llegó ${ORIGEN_LABEL[cita.comprobante_origen]}`}
               </div>
-              {cita.comprobante_nota && <p className="text-muted-foreground">{cita.comprobante_nota}</p>}
+              {cita.comprobante_nota && (
+                <p className="break-words text-muted-foreground">{cita.comprobante_nota}</p>
+              )}
             </div>
           </>
         ) : (
@@ -161,7 +163,7 @@ export default function FichaReserva({ cita }: { cita: Cita & { clientes: { nomb
       </section>
 
       {/* --- historial de visitas --- */}
-      <section className="space-y-2">
+      <section className="min-w-0 space-y-2">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           Historial {ficha && `· cliente desde ${fechaCorta(ficha.created_at)}`}
         </h4>
@@ -187,7 +189,7 @@ export default function FichaReserva({ cita }: { cita: Cita & { clientes: { nomb
       </section>
 
       {/* --- ficha editable --- */}
-      <section className="space-y-3">
+      <section className="min-w-0 space-y-3">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ficha del cliente</h4>
 
         <div className="space-y-1.5">

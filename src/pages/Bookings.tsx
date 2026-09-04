@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react"
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { actualizarEstadoCita as actualizarEstadoCitaBot, BotApiError } from "@/lib/botApi"
@@ -13,6 +13,7 @@ import {
 import FichaReserva from "@/components/FichaReserva"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
@@ -29,7 +30,22 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ChevronDown, ChevronRight, Image as ImageIcon } from "lucide-react"
+import {
+  CalendarCheck2,
+  CalendarX2,
+  CheckCheck,
+  ChevronDown,
+  ChevronRight,
+  Image as ImageIcon,
+  LayoutList,
+  Plus,
+  Scissors,
+  UserRound,
+  UserX,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react"
+import NuevaCitaDialog from "@/components/NuevaCitaDialog"
 
 /** Cita + los datos del cliente y servicio que trae el join de Supabase. */
 type CitaConDetalle = Cita & {
@@ -40,17 +56,17 @@ type CitaConDetalle = Cita & {
 // "expirada" no está en el menú de cambio de estado: la pone el bot al
 // liberar un horario sin adelanto, no es algo que el staff marque a mano.
 const ESTADO_ORDER: CitaEstado[] = ["confirmada", "completada", "no_asistio", "cancelada"]
-const FILTROS: { key: "all" | CitaEstado; label: string }[] = [
-  { key: "all", label: "Todas" },
-  { key: "pendiente_pago", label: "Esperando adelanto" },
-  { key: "confirmada", label: "Confirmadas" },
-  { key: "completada", label: "Completadas" },
-  { key: "no_asistio", label: "No asistió" },
-  { key: "cancelada", label: "Canceladas" },
+const FILTROS: { key: "all" | CitaEstado; label: string; icon: LucideIcon }[] = [
+  { key: "all", label: "Todas", icon: LayoutList },
+  { key: "pendiente_pago", label: "Esperando adelanto", icon: Wallet },
+  { key: "confirmada", label: "Confirmadas", icon: CalendarCheck2 },
+  { key: "completada", label: "Completadas", icon: CheckCheck },
+  { key: "no_asistio", label: "No asistió", icon: UserX },
+  { key: "cancelada", label: "Canceladas", icon: CalendarX2 },
 ]
-const BARBERO_FILTROS: { key: "all" | Barbero; label: string }[] = [
-  { key: "all", label: "Todos los barberos" },
-  ...BARBEROS.map((b) => ({ key: b, label: b })),
+const BARBERO_FILTROS: { key: "all" | Barbero; label: string; icon: LucideIcon }[] = [
+  { key: "all", label: "Todos los barberos", icon: UserRound },
+  ...BARBEROS.map((b) => ({ key: b, label: b, icon: Scissors })),
 ]
 
 function formatDateTime(iso: string) {
@@ -95,13 +111,12 @@ export default function Bookings() {
   // Una fila abierta a la vez: la ficha es alta y con dos abiertas se pierde
   // la tabla de vista.
   const [abierta, setAbierta] = useState<string | null>(null)
+  const [nuevaAbierta, setNuevaAbierta] = useState(false)
   const [filter, setFilter] = useState<"all" | CitaEstado>("all")
   const [barberoFilter, setBarberoFilter] = useState<"all" | Barbero>("all")
 
-  useEffect(() => {
-    let active = true
-
-    async function load() {
+  // Fuera del efecto para poder refrescar también al crear una cita a mano.
+  const load = useCallback(async () => {
       // Fuente única: citas (WhatsApp y la reserva web escriben acá desde
       // que reserva.html pasó a agendar vía el bot en vez de una tabla
       // 'bookings' aparte sin validación de horario real.
@@ -109,14 +124,15 @@ export default function Bookings() {
         .from("citas")
         .select("*, clientes!inner(nombre, telefono), services!inner(name)")
         .order("inicio_utc", { ascending: true })
-      if (!active) return
       if (error) {
         toast.error("No se pudieron cargar las reservas.")
       } else {
         setCitas(data as CitaConDetalle[])
       }
       setLoading(false)
-    }
+  }, [])
+
+  useEffect(() => {
     load()
 
     const channel = supabase
@@ -127,10 +143,9 @@ export default function Bookings() {
       .subscribe()
 
     return () => {
-      active = false
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [load])
 
   async function updateStatus(id: string, estado: CitaEstado) {
     const previous = citas
@@ -168,12 +183,17 @@ export default function Bookings() {
               : `${confirmadasCount} cita${confirmadasCount === 1 ? "" : "s"} confirmada${confirmadasCount === 1 ? "" : "s"}, de WhatsApp y la web.`}
           </p>
         </div>
+        <Button onClick={() => setNuevaAbierta(true)} className="gap-2">
+          <Plus className="size-4" />
+          Nueva cita
+        </Button>
       </div>
 
       <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)} className="mb-3">
         <TabsList>
           {FILTROS.map((f) => (
-            <TabsTrigger key={f.key} value={f.key}>
+            <TabsTrigger key={f.key} value={f.key} className="gap-1.5">
+              <f.icon className="size-3.5" />
               {f.label}
             </TabsTrigger>
           ))}
@@ -183,12 +203,19 @@ export default function Bookings() {
       <Tabs value={barberoFilter} onValueChange={(v) => setBarberoFilter(v as typeof barberoFilter)} className="mb-4">
         <TabsList>
           {BARBERO_FILTROS.map((f) => (
-            <TabsTrigger key={f.key} value={f.key}>
+            <TabsTrigger key={f.key} value={f.key} className="gap-1.5">
+              <f.icon className="size-3.5" />
               {f.label}
             </TabsTrigger>
           ))}
         </TabsList>
       </Tabs>
+
+      <NuevaCitaDialog
+        open={nuevaAbierta}
+        onOpenChange={setNuevaAbierta}
+        onCreada={load}
+      />
 
       <div className="overflow-hidden rounded-lg border border-border bg-card">
         {loading ? (
@@ -285,7 +312,11 @@ export default function Bookings() {
                     </TableRow>
                     {expandida && (
                       <TableRow className="hover:bg-transparent">
-                        <TableCell colSpan={7} className="bg-muted/40 p-0">
+                        {/* whitespace-normal anula el nowrap que TableCell trae
+                            de fábrica: la ficha lleva texto largo (la nota del
+                            análisis del comprobante) que si no se sale de su
+                            columna y se monta sobre la de al lado. */}
+                        <TableCell colSpan={7} className="bg-muted/40 p-0 whitespace-normal">
                           <FichaReserva cita={c} />
                         </TableCell>
                       </TableRow>

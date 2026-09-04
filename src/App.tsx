@@ -39,7 +39,9 @@ function Gate() {
   return (
     <AppShell>
       <Routes>
-        <Route path="/" element={<Navigate to="/reservas" replace />} />
+        {/* El dueño entra a su tablero; la recepción, a la agenda del día —
+            cada uno a lo que abre primero cuando llega. */}
+        <Route path="/" element={<Navigate to={role === "superadmin" ? "/control" : "/reservas"} replace />} />
         <Route path="/productos" element={<Productos />} />
         <Route path="/servicios" element={<Servicios />} />
         <Route path="/reservas" element={<Bookings />} />
@@ -55,7 +57,7 @@ function Gate() {
             roleCargando ? null : role === "superadmin" ? <Control /> : <Navigate to="/reservas" replace />
           }
         />
-        <Route path="*" element={<Navigate to="/reservas" replace />} />
+        <Route path="*" element={<Navigate to={role === "superadmin" ? "/control" : "/reservas"} replace />} />
       </Routes>
     </AppShell>
   )

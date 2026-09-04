@@ -7,8 +7,10 @@ import {
   CITA_ESTADO_LABEL,
   COMPROBANTE_ESTADO_LABEL,
   type Barbero,
+  METODO_PAGO_LABEL,
   type Cita,
   type CitaEstado,
+  type MetodoPago,
 } from "@/lib/types"
 import FichaReserva from "@/components/FichaReserva"
 import { cn } from "@/lib/utils"
@@ -46,6 +48,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import NuevaCitaDialog from "@/components/NuevaCitaDialog"
+import CobroDialog from "@/components/CobroDialog"
 
 /** Cita + los datos del cliente y servicio que trae el join de Supabase. */
 type CitaConDetalle = Cita & {
@@ -112,6 +115,9 @@ export default function Bookings() {
   // la tabla de vista.
   const [abierta, setAbierta] = useState<string | null>(null)
   const [nuevaAbierta, setNuevaAbierta] = useState(false)
+  // La cita que se está dando por atendida, mientras se elige con qué pagó.
+  const [cobrando, setCobrando] = useState<CitaConDetalle | null>(null)
+  const [cobrandoGuardando, setCobrandoGuardando] = useState(false)
   const [filter, setFilter] = useState<"all" | CitaEstado>("all")
   const [barberoFilter, setBarberoFilter] = useState<"all" | Barbero>("all")
 
@@ -147,14 +153,24 @@ export default function Bookings() {
     }
   }, [load])
 
-  async function updateStatus(id: string, estado: CitaEstado) {
+  /**
+   * Completar es cobrar: antes de marcarla, se pregunta con qué pagó. El
+   * resto de estados (cancelada, no asistió…) no mueven plata, así que van
+   * directo.
+   */
+  function pedirEstado(cita: CitaConDetalle, estado: CitaEstado) {
+    if (estado === "completada") setCobrando(cita)
+    else updateStatus(cita.id, estado)
+  }
+
+  async function updateStatus(id: string, estado: CitaEstado, metodoPago?: MetodoPago) {
     const previous = citas
-    setCitas((rows) => rows.map((c) => (c.id === id ? { ...c, estado } : c)))
+    setCitas((rows) => rows.map((c) => (c.id === id ? { ...c, estado, ...(metodoPago ? { metodo_pago: metodoPago } : {}) } : c)))
     try {
       // Vía el bot, no un update directo: si se cancela, el bot también
       // borra el evento de Calendar — un update directo a Supabase dejaba
       // el evento huérfano.
-      await actualizarEstadoCitaBot(id, estado)
+      await actualizarEstadoCitaBot(id, estado, metodoPago)
       toast.success(`Cita marcada como ${CITA_ESTADO_LABEL[estado].toLowerCase()}.`)
     } catch (err) {
       setCitas(previous)
@@ -216,6 +232,22 @@ export default function Bookings() {
         onOpenChange={setNuevaAbierta}
         onCreada={load}
       />
+
+      {cobrando && (
+        <CobroDialog
+          open
+          onOpenChange={(v) => !v && setCobrando(null)}
+          cliente={cobrando.clientes.nombre?.trim() || cobrando.clientes.telefono}
+          detalle={cobrando.services.name}
+          guardando={cobrandoGuardando}
+          onConfirmar={async (metodo) => {
+            setCobrandoGuardando(true)
+            await updateStatus(cobrando.id, "completada", metodo)
+            setCobrandoGuardando(false)
+            setCobrando(null)
+          }}
+        />
+      )}
 
       <div className="overflow-hidden rounded-lg border border-border bg-card">
         {loading ? (
@@ -289,6 +321,12 @@ export default function Bookings() {
                             {COMPROBANTE_ESTADO_LABEL[c.comprobante_estado]}
                           </div>
                         )}
+                        {c.metodo_pago && (
+                          <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                            <Wallet className="size-3" />
+                            {METODO_PAGO_LABEL[c.metodo_pago]}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
@@ -301,7 +339,7 @@ export default function Bookings() {
                               <DropdownMenuItem
                                 key={estado}
                                 disabled={estado === c.estado}
-                                onClick={() => updateStatus(c.id, estado)}
+                                onClick={() => pedirEstado(c, estado)}
                               >
                                 {CITA_ESTADO_LABEL[estado]}
                               </DropdownMenuItem>

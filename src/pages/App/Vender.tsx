@@ -3,9 +3,10 @@ import { toast } from "sonner"
 import { Loader2, ShoppingCart } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/lib/auth"
-import type { Product } from "@/lib/types"
+import { METODOS_PAGO, METODO_PAGO_LABEL, type MetodoPago, type Product } from "@/lib/types"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { cn } from "@/lib/utils"
 
 /**
  * Registrar la venta de un producto desde el celular, en el momento — sin
@@ -22,6 +23,7 @@ export default function Vender() {
   const [cargando, setCargando] = useState(true)
   const [productoId, setProductoId] = useState("")
   const [cantidad, setCantidad] = useState("1")
+  const [metodo, setMetodo] = useState<MetodoPago | null>(null)
   const [nota, setNota] = useState("")
   const [guardando, setGuardando] = useState(false)
 
@@ -50,6 +52,7 @@ export default function Vender() {
     if (cantidadNum > producto.stock) {
       return toast.error(`Solo quedan ${producto.stock} de ${producto.name}.`)
     }
+    if (!metodo) return toast.error("Marca con qué pagó.")
     if (!session?.user.id) return toast.error("Tu sesión expiró — vuelve a entrar.")
 
     setGuardando(true)
@@ -57,6 +60,7 @@ export default function Vender() {
       producto_id: producto.id,
       cantidad: cantidadNum,
       precio_unitario: producto.price,
+      metodo_pago: metodo,
       nota: nota.trim() || null,
       registrado_por: session.user.id,
     })
@@ -68,6 +72,7 @@ export default function Vender() {
     toast.success(`Registrado: ${cantidadNum} × ${producto.name}.`)
     setProductoId("")
     setCantidad("1")
+    setMetodo(null)
     setNota("")
     // El stock cambió: se recarga para que el siguiente registro vea el real.
     const { data } = await supabase.from("products").select("*").eq("active", true).order("sort_order")
@@ -114,9 +119,25 @@ export default function Vender() {
         />
       </div>
 
+      <div className="space-y-2">
+        <Label className="brand-serif">¿Con qué pagó?</Label>
+        <div className="grid grid-cols-3 gap-2">
+          {METODOS_PAGO.map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMetodo(m)}
+              className={cn("chip23 py-3 text-[11px]", metodo === m && "on")}
+            >
+              {METODO_PAGO_LABEL[m]}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="space-y-1.5">
         <Label className="brand-serif">Nota (opcional)</Label>
-        <Input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Yape, efectivo…" className="h-12" />
+        <Input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Para quién, si dejó saldo…" className="h-12" />
       </div>
 
       {total != null && (

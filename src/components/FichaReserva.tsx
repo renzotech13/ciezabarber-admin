@@ -3,7 +3,15 @@ import { toast } from "sonner"
 import { Loader2, Save, ImageOff } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useServiceNames } from "@/lib/services"
-import { COMPROBANTE_ESTADO_LABEL, CITA_ESTADO_LABEL, type Cita, type FichaCliente } from "@/lib/types"
+import {
+  COMPROBANTE_ESTADO_LABEL,
+  CITA_ESTADO_LABEL,
+  METODOS_PAGO,
+  METODO_PAGO_LABEL,
+  type Cita,
+  type FichaCliente,
+  type MetodoPago,
+} from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
@@ -33,6 +41,7 @@ export default function FichaReserva({ cita }: { cita: Cita & { clientes: { nomb
   const [alergias, setAlergias] = useState("")
   const [notas, setNotas] = useState("")
   const [atencion, setAtencion] = useState("")
+  const [metodoPago, setMetodoPago] = useState<MetodoPago | null>(cita.metodo_pago)
   const [guardando, setGuardando] = useState(false)
 
   useEffect(() => {
@@ -67,6 +76,7 @@ export default function FichaReserva({ cita }: { cita: Cita & { clientes: { nomb
       setAlergias(cliente?.alergias ?? "")
       setNotas(cliente?.notas ?? "")
       setAtencion(cita.atencion_notas ?? "")
+      setMetodoPago(cita.metodo_pago)
       setHistorial((historialRes.data as Cita[] | null) ?? [])
 
       // El bucket es privado: la imagen solo se ve con una URL firmada, que
@@ -83,7 +93,7 @@ export default function FichaReserva({ cita }: { cita: Cita & { clientes: { nomb
     return () => {
       activo = false
     }
-  }, [cita.id, cita.cliente_id, cita.comprobante_path, cita.atencion_notas])
+  }, [cita.id, cita.cliente_id, cita.comprobante_path, cita.atencion_notas, cita.metodo_pago])
 
   async function guardar() {
     setGuardando(true)
@@ -98,7 +108,10 @@ export default function FichaReserva({ cita }: { cita: Cita & { clientes: { nomb
           notas: notas.trim() || null,
         })
         .eq("id", cita.cliente_id),
-      supabase.from("citas").update({ atencion_notas: atencion.trim() || null }).eq("id", cita.id),
+      supabase
+        .from("citas")
+        .update({ atencion_notas: atencion.trim() || null, metodo_pago: metodoPago })
+        .eq("id", cita.id),
     ])
     setGuardando(false)
     if (clienteRes.error || citaRes.error) toast.error("No se pudo guardar la ficha.")
@@ -160,6 +173,26 @@ export default function FichaReserva({ cita }: { cita: Cita & { clientes: { nomb
               : "Sin comprobante registrado."}
           </div>
         )}
+
+        {/* --- con qué pagó: se registra al completar, se corrige acá --- */}
+        <div className="space-y-1.5 pt-1">
+          <div className="brand-wide text-[10px] text-muted-foreground">Cobrado con</div>
+          <div className="flex flex-wrap gap-1.5">
+            {METODOS_PAGO.map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMetodoPago(metodoPago === m ? null : m)}
+                className={cn("chip23 px-2.5 py-2 text-[11px]", metodoPago === m && "on")}
+              >
+                {METODO_PAGO_LABEL[m]}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Se guarda con el botón de abajo, junto con la ficha.
+          </p>
+        </div>
       </section>
 
       {/* --- historial de visitas --- */}

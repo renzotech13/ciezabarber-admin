@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Cita, CitaEstado, Mensaje } from "./types"
+import type { Cita, CitaEstado, MetodoPago, Mensaje } from "./types"
 
 const BASE_URL = import.meta.env.VITE_BOT_API_URL as string | undefined
 
@@ -110,8 +110,11 @@ export function enviarPromocion(params: { clienteIds: string[]; plantilla: strin
  * también borre el evento de Calendar — el navegador nunca tiene las
  * credenciales de la service account.
  */
-export function actualizarEstadoCita(citaId: string, estado: CitaEstado) {
-  return post<{ cita: Cita }>(`/admin/citas/${citaId}/estado`, { estado })
+export function actualizarEstadoCita(citaId: string, estado: CitaEstado, metodoPago?: MetodoPago) {
+  return post<{ cita: Cita }>(`/admin/citas/${citaId}/estado`, {
+    estado,
+    ...(metodoPago ? { metodo_pago: metodoPago } : {}),
+  })
 }
 
 /** Lo que el barbero anota después de atender (el corte, el tono, la máquina). */

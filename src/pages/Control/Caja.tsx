@@ -3,6 +3,7 @@ import { toast } from "sonner"
 import { Loader2, LockKeyhole, Unlock } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/lib/auth"
+import { METODOS_PAGO, METODO_PAGO_LABEL, type MetodoPago } from "@/lib/types"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -39,21 +40,30 @@ function precioNumerico(price: string): number | null {
   return Number.isFinite(n) && n > 0 ? n : null
 }
 
+type CitaCobrada = { metodo_pago: MetodoPago | null; services: { price: string } }
+type VentaCobrada = { cantidad: number; precio_unitario: number; metodo_pago: MetodoPago | null }
+
+/** Acumulador por medio de pago. "sin_marcar" son los cobros de antes de la 0024. */
+function vacio(): Record<MetodoPago | "sin_marcar", number> {
+  return { yape_plin: 0, tarjeta: 0, efectivo: 0, sin_marcar: 0 }
+}
+
 /**
  * Arqueo del turno: se abre con el fondo de caja y se cierra contando lo que
  * hay. Mientras está abierta va sumando lo que se movió desde que se abrió
- * (servicios atendidos + productos vendidos), para tener contra qué comparar.
+ * (servicios atendidos + productos vendidos), repartido por medio de pago.
  *
- * Ojo con lo que ese total significa: incluye TODO lo cobrado, no solo el
- * efectivo — los pagos de reservas entran por Yape y muchas ventas también. Por eso
- * la diferencia al cerrar no es un descuadre, es sobre todo lo que no pasó
- * por la caja; el campo de nota está para dejar constancia de eso.
+ * Ese reparto es lo que hace que el arqueo signifique algo: en el cajón solo
+ * tiene que estar el fondo más lo cobrado EN EFECTIVO. Lo de Yape/Plin y lo
+ * del POS entró por otro lado, así que sumarlo al esperado convertía cada
+ * cierre en un falso descuadre.
  */
 export default function Caja() {
   const { session } = useAuth()
   const [sesiones, setSesiones] = useState<Sesion[]>([])
   const [cargando, setCargando] = useState(true)
-  const [movido, setMovido] = useState<{ servicios: number; productos: number } | null>(null)
+  type PorMetodo = Record<MetodoPago | "sin_marcar", number>
+  const [movido, setMovido] = useState<{ servicios: PorMetodo; productos: PorMetodo } | null>(null)
 
   const [montoInicial, setMontoInicial] = useState("0")
   const [montoContado, setMontoContado] = useState("")
@@ -94,20 +104,24 @@ export default function Caja() {
       const [citasRes, ventasRes] = await Promise.all([
         supabase
           .from("citas")
-          .select("services!inner(price)")
+          .select("metodo_pago, services!inner(price)")
           .eq("estado", "completada")
           .gte("inicio_utc", desde),
-        supabase.from("ventas_productos").select("cantidad, precio_unitario").gte("vendido_at", desde),
+        supabase
+          .from("ventas_productos")
+          .select("cantidad, precio_unitario, metodo_pago")
+          .gte("vendido_at", desde),
       ])
       if (!activo) return
-      const servicios = ((citasRes.data ?? []) as unknown as { services: { price: string } }[]).reduce(
-        (s, c) => s + (precioNumerico(c.services.price) ?? 0),
-        0,
-      )
-      const productos = ((ventasRes.data ?? []) as { cantidad: number; precio_unitario: number }[]).reduce(
-        (s, v) => s + v.cantidad * v.precio_unitario,
-        0,
-      )
+
+      const servicios = vacio()
+      for (const c of (citasRes.data ?? []) as unknown as CitaCobrada[]) {
+        servicios[c.metodo_pago ?? "sin_marcar"] += precioNumerico(c.services.price) ?? 0
+      }
+      const productos = vacio()
+      for (const v of (ventasRes.data ?? []) as VentaCobrada[]) {
+        productos[v.metodo_pago ?? "sin_marcar"] += v.cantidad * v.precio_unitario
+      }
       setMovido({ servicios, productos })
     }
     calcular()
@@ -174,8 +188,15 @@ export default function Caja() {
     )
   }
 
-  const totalMovido = (movido?.servicios ?? 0) + (movido?.productos ?? 0)
-  const esperadoEnCaja = (abierta?.monto_inicial ?? 0) + totalMovido
+  const porMetodo = vacio()
+  for (const clave of Object.keys(porMetodo) as (MetodoPago | "sin_marcar")[]) {
+    porMetodo[clave] = (movido?.servicios[clave] ?? 0) + (movido?.productos[clave] ?? 0)
+  }
+  const totalMovido = Object.values(porMetodo).reduce((s, n) => s + n, 0)
+  // Lo que TIENE que estar en el cajón: el fondo más lo cobrado en efectivo.
+  const esperadoEnCaja = (abierta?.monto_inicial ?? 0) + porMetodo.efectivo
+  const totalServicios = Object.values(movido?.servicios ?? {}).reduce((s, n) => s + n, 0)
+  const totalProductos = Object.values(movido?.productos ?? {}).reduce((s, n) => s + n, 0)
 
   return (
     <div className="space-y-5">
@@ -183,10 +204,32 @@ export default function Caja() {
         <>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Tile etiqueta="Fondo de caja" valor={formatoSoles(abierta.monto_inicial)} detalle={fechaHora(abierta.abierta_at)} />
-            <Tile etiqueta="Servicios atendidos" valor={formatoSoles(movido?.servicios ?? 0)} />
-            <Tile etiqueta="Productos vendidos" valor={formatoSoles(movido?.productos ?? 0)} />
-            <Tile etiqueta="Si todo fuera efectivo" valor={formatoSoles(esperadoEnCaja)} detalle="fondo + lo movido" />
+            <Tile etiqueta="Servicios atendidos" valor={formatoSoles(totalServicios)} />
+            <Tile etiqueta="Productos vendidos" valor={formatoSoles(totalProductos)} />
+            <Tile
+              etiqueta="Debería haber en el cajón"
+              valor={formatoSoles(esperadoEnCaja)}
+              detalle="fondo + efectivo"
+            />
           </div>
+
+          <Ficha>
+            <CabeceraFicha mini={`${formatoSoles(totalMovido)} movidos en el turno`} titulo="Cómo pagaron" />
+            <div className="grid gap-px bg-border sm:grid-cols-3">
+              {METODOS_PAGO.map((m) => (
+                <div key={m} className="bg-card px-5 py-4">
+                  <div className="brand-wide tnum text-[22px] leading-none">{formatoSoles(porMetodo[m])}</div>
+                  <div className="brand-serif mt-2 text-[13px] text-muted-foreground">{METODO_PAGO_LABEL[m]}</div>
+                </div>
+              ))}
+            </div>
+            {porMetodo.sin_marcar > 0 && (
+              <p className="brand-serif border-t border-border px-5 py-3 text-[12px] text-muted-foreground">
+                {formatoSoles(porMetodo.sin_marcar)} sin medio de pago marcado — quedan fuera del efectivo
+                esperado. Se corrige en la ficha de cada reserva.
+              </p>
+            )}
+          </Ficha>
 
           <Ficha>
             <CabeceraFicha mini={`Abierta el ${fechaHora(abierta.abierta_at)}`} titulo="Cerrar caja" />
@@ -207,11 +250,17 @@ export default function Caja() {
 
               {montoContado.trim() !== "" && Number.isFinite(Number(montoContado)) && (
                 <p className="brand-serif text-[13px] text-muted-foreground">
-                  Contra el total de arriba faltan{" "}
-                  <span className="tnum font-semibold text-foreground">
-                    {formatoSoles(Math.max(0, esperadoEnCaja - Number(montoContado)))}
-                  </span>
-                  , que es lo que se habría cobrado por Yape o transferencia. Déjalo anotado abajo si algo no cuadra.
+                  {Math.abs(esperadoEnCaja - Number(montoContado)) < 0.005 ? (
+                    <>La caja cuadra: coincide con el fondo más el efectivo cobrado.</>
+                  ) : (
+                    <>
+                      {esperadoEnCaja > Number(montoContado) ? "Faltan " : "Sobran "}
+                      <span className="tnum font-semibold text-foreground">
+                        {formatoSoles(Math.abs(esperadoEnCaja - Number(montoContado)))}
+                      </span>{" "}
+                      contra el fondo más el efectivo del turno. Déjalo anotado abajo.
+                    </>
+                  )}
                 </p>
               )}
 

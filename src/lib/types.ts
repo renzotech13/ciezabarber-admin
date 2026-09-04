@@ -263,6 +263,18 @@ export const COMPROBANTE_ESTADO_LABEL: Record<ComprobanteEstado, string> = {
 export const BARBEROS = ["Cieza", "Nilton", "Bryan"] as const
 export type Barbero = (typeof BARBEROS)[number]
 
+// Con qué pagó. "yape_plin" junta las dos billeteras a propósito: para la
+// caja son lo mismo (plata que entró al celular, no al cajón), y separarlas
+// obligaría a que quien cobra se acuerde de cuál usó el cliente.
+export const METODOS_PAGO = ["yape_plin", "tarjeta", "efectivo"] as const
+export type MetodoPago = (typeof METODOS_PAGO)[number]
+
+export const METODO_PAGO_LABEL: Record<MetodoPago, string> = {
+  yape_plin: "Yape / Plin",
+  tarjeta: "Tarjeta (POS)",
+  efectivo: "Efectivo",
+}
+
 export type Cita = {
   id: string
   cliente_id: string
@@ -285,6 +297,8 @@ export type Cita = {
   reserva_id: string
   /** Lo que el barbero anota DESPUÉS de atender: el corte real, el tono, la máquina. */
   atencion_notas: string | null
+  /** Con qué pagó. null en las citas anteriores a que se registrara. */
+  metodo_pago: MetodoPago | null
 }
 
 /** Ficha del cliente: lo que el barbero repasa antes de atenderlo. */

@@ -2,11 +2,11 @@ import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/lib/auth"
-import type { Product } from "@/lib/types"
-import { Button } from "@/components/ui/button"
+import { METODOS_PAGO, METODO_PAGO_LABEL, type MetodoPago, type Product } from "@/lib/types"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ModalFicha } from "@/components/ModalFicha"
+import { cn } from "@/lib/utils"
 
 /**
  * Registrar una venta de producto, disponible para cualquier staff (no solo
@@ -30,6 +30,7 @@ export default function RegistrarVentaDialog({
   const { session } = useAuth()
   const [productoId, setProductoId] = useState("")
   const [cantidad, setCantidad] = useState("1")
+  const [metodo, setMetodo] = useState<MetodoPago | null>(null)
   const [nota, setNota] = useState("")
   const [guardando, setGuardando] = useState(false)
 
@@ -37,6 +38,7 @@ export default function RegistrarVentaDialog({
     if (!open) return
     setProductoId("")
     setCantidad("1")
+    setMetodo(null)
     setNota("")
   }, [open])
 
@@ -53,6 +55,7 @@ export default function RegistrarVentaDialog({
     if (cantidadNum > producto.stock) {
       return toast.error(`Solo hay ${producto.stock} en stock de ${producto.name}.`)
     }
+    if (!metodo) return toast.error("Marca con qué pagó.")
     if (!session?.user.id) return toast.error("Tu sesión expiró — vuelve a iniciar sesión.")
 
     setGuardando(true)
@@ -60,6 +63,7 @@ export default function RegistrarVentaDialog({
       producto_id: producto.id,
       cantidad: cantidadNum,
       precio_unitario: producto.price,
+      metodo_pago: metodo,
       nota: nota.trim() || null,
       registrado_por: session.user.id,
     })
@@ -73,45 +77,74 @@ export default function RegistrarVentaDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Registrar venta</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label>Producto</Label>
-            <select
-              value={productoId}
-              onChange={(e) => setProductoId(e.target.value)}
-              className="h-9 w-full rounded-md border border-input bg-card px-3 text-sm outline-none focus:border-ring"
-            >
-              <option value="">Elegir producto…</option>
-              {activos.map((p) => (
-                <option key={p.id} value={p.id} disabled={p.stock <= 0}>
-                  {p.name} — S/ {p.price} {p.stock <= 0 ? "(agotado)" : `(stock ${p.stock})`}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Cantidad</Label>
-            <Input type="number" min={1} value={cantidad} onChange={(e) => setCantidad(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>Nota (opcional)</Label>
-            <Input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Yape, efectivo, cliente…" />
-          </div>
-          {total != null && (
-            <p className="text-sm text-muted-foreground">
-              Total a cobrar: <span className="font-semibold text-foreground">S/ {total.toFixed(2)}</span>
-            </p>
-          )}
-          <Button onClick={registrar} disabled={guardando} className="w-full">
-            {guardando ? "Guardando…" : "Registrar venta"}
-          </Button>
+    <ModalFicha
+      open={open}
+      onOpenChange={onOpenChange}
+      mini="Tienda del estudio"
+      titulo="Registrar venta"
+      ancho="sm:max-w-md"
+      pie={
+        <button onClick={registrar} disabled={guardando} className="chip23 on disabled:opacity-40">
+          {guardando ? "Guardando…" : "Registrar venta"}
+        </button>
+      }
+    >
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <Label className="brand-serif">Producto</Label>
+          <select
+            value={productoId}
+            onChange={(e) => setProductoId(e.target.value)}
+            className="h-11 w-full rounded-none border border-border bg-card px-3 text-sm outline-none focus:border-foreground"
+          >
+            <option value="">Elegir producto…</option>
+            {activos.map((p) => (
+              <option key={p.id} value={p.id} disabled={p.stock <= 0}>
+                {p.name} — S/ {p.price} {p.stock <= 0 ? "(agotado)" : `(stock ${p.stock})`}
+              </option>
+            ))}
+          </select>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        <div className="space-y-1.5">
+          <Label className="brand-serif">Cantidad</Label>
+          <Input
+            type="number"
+            min={1}
+            value={cantidad}
+            onChange={(e) => setCantidad(e.target.value)}
+            className="tnum h-11 max-w-28"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label className="brand-serif">¿Con qué pagó?</Label>
+          <div className="flex flex-wrap gap-2">
+            {METODOS_PAGO.map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMetodo(m)}
+                className={cn("chip23", metodo === m && "on")}
+              >
+                {METODO_PAGO_LABEL[m]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="brand-serif">Nota (opcional)</Label>
+          <Input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Para quién, si dejó saldo…" />
+        </div>
+
+        {total != null && (
+          <div className="border border-border bg-muted/40 px-4 py-3">
+            <div className="brand-serif text-[12px] text-muted-foreground">Total a cobrar</div>
+            <div className="brand-wide tnum mt-1 text-[24px] leading-none">S/ {total.toFixed(2)}</div>
+          </div>
+        )}
+      </div>
+    </ModalFicha>
   )
 }

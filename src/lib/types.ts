@@ -41,7 +41,14 @@ export type Service = {
   category_id: string
   booking_group: BookingGroup
   name: string
+  /** Etiqueta que ve el cliente ("45 min"), derivada de duration_minutes. */
   duration: string
+  /**
+   * Los minutos de verdad. Sin esto el bot no sabe a qué hora termina, así
+   * que el servicio no se puede reservar ni registrar: es null solo en
+   * servicios cargados antes de que el formulario lo pidiera.
+   */
+  duration_minutes: number | null
   price: string
   description: string
   sort_order: number

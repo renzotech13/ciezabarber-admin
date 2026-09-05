@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 
 const TZ = "America/Lima"
 
-type Servicio = { id: string; name: string; duration: string; price: string }
+type Servicio = { id: string; name: string; duration: string; duration_minutes: number | null; price: string }
 
 function proximosDias(cantidad = 8): string[] {
   const hoy = new Date().toLocaleDateString("en-CA", { timeZone: TZ })
@@ -73,7 +73,7 @@ export default function NuevaCitaDialog({
     setHoras([])
     supabase
       .from("services")
-      .select("id, name, duration, price")
+      .select("id, name, duration, duration_minutes, price")
       .eq("active", true)
       .order("sort_order")
       .then(({ data }) => setServicios((data as Servicio[] | null) ?? []))
@@ -145,9 +145,13 @@ export default function NuevaCitaDialog({
             className="h-11 w-full rounded-none border border-border bg-card px-3 text-sm outline-none focus:border-foreground"
           >
             <option value="">Elegir servicio…</option>
+            {/* Sin minutos cargados el bot no puede calcular a qué hora
+                termina, así que el servicio no se puede usar hasta que se le
+                ponga la duración en Servicios. */}
             {servicios.map((s) => (
-              <option key={s.id} value={s.id}>
+              <option key={s.id} value={s.id} disabled={s.duration_minutes == null}>
                 {s.name} · {s.duration} · S/ {s.price}
+                {s.duration_minutes == null ? " (falta duración)" : ""}
               </option>
             ))}
           </select>

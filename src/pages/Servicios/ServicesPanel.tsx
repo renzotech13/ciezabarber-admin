@@ -162,7 +162,14 @@ export default function ServicesPanel() {
                     <TableCell className="text-sm text-muted-foreground">
                       {categoryById[s.category_id]?.title ?? s.category_id}
                     </TableCell>
-                    <TableCell className="text-sm">{s.duration}</TableCell>
+                    <TableCell className="text-sm">
+                      {s.duration}
+                      {/* Sin minutos el bot no puede agendarlo ni registrarlo:
+                          hay que decirlo donde se ve la lista, no cuando falla. */}
+                      {s.duration_minutes == null && (
+                        <span className="ml-1.5 text-xs text-[var(--status-pending)]">falta duración</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-sm">S/ {s.price}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {s.deposit_amount != null ? `S/ ${s.deposit_amount}` : "—"}

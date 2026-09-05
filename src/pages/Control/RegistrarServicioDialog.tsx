@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils"
 
 const TZ = "America/Lima"
 
-type Servicio = { id: string; name: string; duration: string; price: string }
+type Servicio = { id: string; name: string; duration: string; duration_minutes: number | null; price: string }
 
 /** "2026-09-04" y "18:30" de ahora mismo, en el calendario de Lima. */
 function ahoraLima(): { fecha: string; hora: string } {
@@ -62,7 +62,7 @@ export default function RegistrarServicioDialog({
     setTelefono("")
     supabase
       .from("services")
-      .select("id, name, duration, price")
+      .select("id, name, duration, duration_minutes, price")
       .eq("active", true)
       .order("sort_order")
       .then(({ data }) => setServicios((data as Servicio[] | null) ?? []))
@@ -89,13 +89,9 @@ export default function RegistrarServicioDialog({
       await onRegistrado()
       onOpenChange(false)
     } catch (err) {
-      toast.error(
-        err instanceof BotApiError && err.message.includes("conflicto")
-          ? "Ese barbero ya tiene un servicio a esa hora — corrige la hora."
-          : err instanceof BotApiError
-            ? err.message
-            : "No se pudo registrar el servicio.",
-      )
+      // El bot ya manda el motivo concreto (servicio sin duración, choque de
+      // horario, permisos): mostrarlo tal cual evita el "no se pudo" a secas.
+      toast.error(err instanceof BotApiError ? err.message : "No se pudo registrar el servicio.")
     } finally {
       setGuardando(false)
     }
@@ -124,9 +120,13 @@ export default function RegistrarServicioDialog({
             className="h-11 w-full border border-border bg-card px-3 text-sm outline-none focus:border-foreground"
           >
             <option value="">Elegir servicio…</option>
+            {/* Sin minutos cargados el bot no puede calcular a qué hora
+                termina, así que el servicio no se puede usar hasta que se le
+                ponga la duración en Servicios. */}
             {servicios.map((s) => (
-              <option key={s.id} value={s.id}>
+              <option key={s.id} value={s.id} disabled={s.duration_minutes == null}>
                 {s.name} · {s.duration} · S/ {s.price}
+                {s.duration_minutes == null ? " (falta duración)" : ""}
               </option>
             ))}
           </select>

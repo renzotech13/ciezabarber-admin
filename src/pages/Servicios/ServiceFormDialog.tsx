@@ -9,6 +9,28 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ModalFicha } from "@/components/ModalFicha"
 
+/**
+ * "45 min", "1 h 20 min" — la etiqueta que ve el cliente en la carta, armada
+ * a partir de los minutos reales para que las dos nunca se contradigan.
+ */
+function etiquetaDuracion(minutos: number): string {
+  const horas = Math.floor(minutos / 60)
+  const resto = minutos % 60
+  if (horas === 0) return `${resto} min`
+  return resto === 0 ? `${horas} h` : `${horas} h ${resto} min`
+}
+
+/** Lee los minutos de una duración escrita a mano ("1 h 20 min", "45 min", "1"). */
+function minutosDesdeTexto(texto: string): number | null {
+  const t = texto.toLowerCase()
+  const horas = /(\d+)\s*h/.exec(t)
+  const mins = /(\d+)\s*m/.exec(t)
+  if (horas || mins) return Number(horas?.[1] ?? 0) * 60 + Number(mins?.[1] ?? 0)
+  const solo = /^\s*(\d+)\s*$/.exec(t)
+  // Un número pelado en la carta vieja significaba horas ("1" = 1 h).
+  return solo ? Number(solo[1]) * 60 : null
+}
+
 function slugify(text: string) {
   return text
     .toLowerCase()
@@ -40,7 +62,7 @@ export default function ServiceFormDialog({
   const [categoryId, setCategoryId] = useState("")
   const [bookingGroup, setBookingGroup] = useState<(typeof BOOKING_GROUPS)[number]>(defaultBookingGroup)
   const [name, setName] = useState("")
-  const [duration, setDuration] = useState("")
+  const [duracionMin, setDuracionMin] = useState("")
   const [price, setPrice] = useState("")
   const [description, setDescription] = useState("")
   const [depositAmount, setDepositAmount] = useState("")
@@ -53,7 +75,11 @@ export default function ServiceFormDialog({
     setCategoryId(service?.category_id ?? categories[0]?.id ?? "")
     setBookingGroup(service?.booking_group ?? defaultBookingGroup)
     setName(service?.name ?? "")
-    setDuration(service?.duration ?? "—")
+    // Los servicios viejos pueden no tener los minutos cargados: se deducen
+    // de la etiqueta para no perderlos al reeditar.
+    setDuracionMin(
+      String(service?.duration_minutes ?? (service?.duration ? (minutosDesdeTexto(service.duration) ?? "") : "")),
+    )
     setPrice(service?.price ?? "")
     setDescription(service?.description ?? "")
     setDepositAmount(service?.deposit_amount != null ? String(service.deposit_amount) : "")
@@ -63,11 +89,21 @@ export default function ServiceFormDialog({
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setSubmitting(true)
+    const minutos = Number(duracionMin)
+    if (!Number.isInteger(minutos) || minutos <= 0) {
+      setSubmitting(false)
+      // Sin minutos el bot no puede calcular a qué hora termina: el servicio
+      // queda invisible para la agenda, la reserva web y el registro manual.
+      toast.error("Pon la duración en minutos: sin eso no se puede reservar ni registrar.")
+      return
+    }
+
     const payload = {
       category_id: categoryId,
       booking_group: bookingGroup,
       name: name.trim(),
-      duration: duration.trim() || "—",
+      duration: etiquetaDuracion(minutos),
+      duration_minutes: minutos,
       price: price.trim(),
       description: description.trim(),
       deposit_amount: depositAmount.trim() ? Number(depositAmount) : null,
@@ -166,8 +202,18 @@ export default function ServiceFormDialog({
 
         <div className="grid grid-cols-3 gap-3">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="svc-duration" className="brand-serif">Duración</Label>
-            <Input id="svc-duration" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="45min" />
+            <Label htmlFor="svc-duration" className="brand-serif">Duración (min)</Label>
+            <Input
+              id="svc-duration"
+              type="number"
+              min="5"
+              step="5"
+              required
+              value={duracionMin}
+              onChange={(e) => setDuracionMin(e.target.value)}
+              placeholder="45"
+              className="tnum"
+            />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="svc-price" className="brand-serif">Precio (S/)</Label>
@@ -188,6 +234,7 @@ export default function ServiceFormDialog({
           </div>
         </div>
         <p className="brand-serif -mt-2 text-[12px] text-muted-foreground">
+          {Number(duracionMin) > 0 && `En la carta se muestra como “${etiquetaDuracion(Number(duracionMin))}”. `}
           Se cobra el servicio completo por adelantado. Llena “pago fijo” solo si este servicio se
           cobra distinto al precio de la carta.
         </p>

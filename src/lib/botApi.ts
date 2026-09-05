@@ -61,9 +61,12 @@ export async function getDisponibilidad(params: {
     throw new BotApiError(MENSAJES_ERROR.red, "red")
   }
   if (!res.ok) {
-    const payload = (await res.json().catch(() => null)) as { error?: string } | null
-    const code = payload?.error ?? "desconocido"
-    throw new BotApiError(MENSAJES_ERROR[code] ?? "No se pudo consultar la disponibilidad.", code)
+    const payload = (await res.json().catch(() => null)) as
+      | { error?: string; code?: string; mensaje?: string; message?: string }
+      | null
+    const code = payload?.code ?? payload?.error ?? "desconocido"
+    const texto = payload?.mensaje ?? payload?.message ?? MENSAJES_ERROR[code]
+    throw new BotApiError(texto ?? "No se pudo consultar la disponibilidad.", code)
   }
   return res.json()
 }
@@ -88,7 +91,15 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 
   const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
   if (!res.ok) {
-    const code = typeof json.error === "string" ? json.error : "desconocido"
+    // Dos formatos posibles: el nuestro ({error, mensaje}) y el de fábrica de
+    // Fastify ({code, error:"Conflict", message}). Leer los dos evita que un
+    // detalle de wiring del servidor deje al usuario sin explicación.
+    const code =
+      typeof json.code === "string"
+        ? json.code
+        : typeof json.error === "string"
+          ? json.error
+          : "desconocido"
     // El bot manda `mensaje` cuando el detalle importa para el usuario
     // (p. ej. la ventana de 24h cerrada); si no, se traduce el código.
     // Con el código a la vista, un fallo raro se puede diagnosticar sin
@@ -96,7 +107,9 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     const texto =
       typeof json.mensaje === "string"
         ? json.mensaje
-        : (MENSAJES_ERROR[code] ?? `No se pudo completar la acción (${code}).`)
+        : typeof json.message === "string"
+          ? json.message
+          : (MENSAJES_ERROR[code] ?? `No se pudo completar la acción (${code}).`)
     throw new BotApiError(texto, code)
   }
   return json as T

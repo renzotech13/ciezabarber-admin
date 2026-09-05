@@ -91,8 +91,12 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     const code = typeof json.error === "string" ? json.error : "desconocido"
     // El bot manda `mensaje` cuando el detalle importa para el usuario
     // (p. ej. la ventana de 24h cerrada); si no, se traduce el código.
+    // Con el código a la vista, un fallo raro se puede diagnosticar sin
+    // tener que abrir los logs del bot.
     const texto =
-      typeof json.mensaje === "string" ? json.mensaje : (MENSAJES_ERROR[code] ?? "No se pudo completar la acción.")
+      typeof json.mensaje === "string"
+        ? json.mensaje
+        : (MENSAJES_ERROR[code] ?? `No se pudo completar la acción (${code}).`)
     throw new BotApiError(texto, code)
   }
   return json as T

@@ -5,20 +5,27 @@ import { supabase } from "@/lib/supabase"
 import { PRODUCT_TAGS, type Product, type ProductTag } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { ModalFicha } from "@/components/ModalFicha"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ImagePicker } from "@/components/ImagePicker"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import RegistrarVentaDialog from "@/components/RegistrarVentaDialog"
+
+const UMBRAL_STOCK_BAJO = 3
+
+/** Se lee de un vistazo: importa si hay que reponer, no el número pelado. */
+function EstadoStock({ stock }: { stock: number }) {
+  if (stock <= 0) {
+    return <span className="brand-wide bg-status-cancelled-bg px-2 py-1 text-[10px] text-status-cancelled">Agotado</span>
+  }
+  if (stock <= UMBRAL_STOCK_BAJO) {
+    return <span className="brand-wide bg-status-pending-bg px-2 py-1 text-[10px] text-status-pending">Quedan {stock}</span>
+  }
+  return <span className="tnum text-sm">{stock}</span>
+}
 
 function ProductFormDialog({
   open,
@@ -36,6 +43,7 @@ function ProductFormDialog({
   const isEdit = !!product
   const [name, setName] = useState("")
   const [price, setPrice] = useState("")
+  const [stock, setStock] = useState("0")
   const [description, setDescription] = useState("")
   const [imageUrl, setImageUrl] = useState("")
   const [linea, setLinea] = useState("")
@@ -47,6 +55,7 @@ function ProductFormDialog({
     if (!open) return
     setName(product?.name ?? "")
     setPrice(product ? String(product.price) : "")
+    setStock(product ? String(product.stock) : "0")
     setDescription(product?.description ?? "")
     setImageUrl(product?.image_url ?? "")
     setLinea(product?.linea ?? "")
@@ -60,6 +69,10 @@ function ProductFormDialog({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    const stockNum = Number(stock)
+    if (stock.trim() === "" || !Number.isInteger(stockNum) || stockNum < 0) {
+      return toast.error("El stock tiene que ser un entero de 0 para arriba.")
+    }
     setSubmitting(true)
     const payload = {
       name: name.trim(),
@@ -70,10 +83,17 @@ function ProductFormDialog({
       tags,
       active,
     }
+    // El stock solo se escribe si de verdad se tocó: mientras el modal está
+    // abierto puede haberse vendido algo y el trigger de la BD ya lo descontó
+    // — mandar el valor viejo sin querer repondría esa unidad.
+    const stockCambiado = !isEdit || stockNum !== product!.stock
 
     const { error } = isEdit
-      ? await supabase.from("products").update(payload).eq("id", product!.id)
-      : await supabase.from("products").insert({ ...payload, sort_order: nextSortOrder })
+      ? await supabase
+          .from("products")
+          .update(stockCambiado ? { ...payload, stock: stockNum } : payload)
+          .eq("id", product!.id)
+      : await supabase.from("products").insert({ ...payload, stock: stockNum, sort_order: nextSortOrder })
 
     setSubmitting(false)
     if (error) {
@@ -86,18 +106,27 @@ function ProductFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Editar producto" : "Nuevo producto"}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="prod-name">Nombre</Label>
-            <Input id="prod-name" required value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="prod-price">Precio (S/)</Label>
+    <ModalFicha
+      open={open}
+      onOpenChange={onOpenChange}
+      mini={isEdit ? "Tienda del estudio" : "Catálogo MUK"}
+      titulo={isEdit ? "Editar producto" : "Nuevo producto"}
+      ancho="sm:max-w-lg"
+      pie={
+        <button type="submit" form="prod-form" disabled={submitting} className="chip23 on disabled:opacity-40">
+          {submitting ? "Guardando…" : "Guardar"}
+        </button>
+      }
+    >
+      <form id="prod-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="prod-name" className="brand-serif">Nombre</Label>
+          <Input id="prod-name" required value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="prod-price" className="brand-serif">Precio (S/)</Label>
             <Input
               id="prod-price"
               type="number"
@@ -106,49 +135,67 @@ function ProductFormDialog({
               required
               value={price}
               onChange={(e) => setPrice(e.target.value)}
+              className="tnum"
             />
           </div>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="prod-desc">Descripción</Label>
-            <Textarea id="prod-desc" required value={description} onChange={(e) => setDescription(e.target.value)} />
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="prod-stock" className="brand-serif">Stock (unidades)</Label>
+            <Input
+              id="prod-stock"
+              type="number"
+              min="0"
+              step="1"
+              required
+              value={stock}
+              onChange={(e) => setStock(e.target.value)}
+              className="tnum"
+            />
           </div>
-          <ImagePicker
-            label="Imagen (opcional)"
-            value={imageUrl || null}
-            onChange={(url) => setImageUrl(url ?? "")}
-          />
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="prod-linea">Línea (opcional)</Label>
-            <Input id="prod-linea" placeholder="Ej. Deep, Fat, mr. muk" value={linea} onChange={(e) => setLinea(e.target.value)} />
+        </div>
+        <p className="brand-serif -mt-2 text-[12px] text-muted-foreground">
+          Se descuenta solo con cada venta registrada, y vuelve a subir si se anula una. Edítalo acá solo
+          cuando llegue mercadería o cuando cuentes lo que hay en vitrina.
+        </p>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="prod-desc" className="brand-serif">Descripción</Label>
+          <Textarea id="prod-desc" required rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+        </div>
+
+        <ImagePicker
+          label="Imagen (opcional)"
+          value={imageUrl || null}
+          onChange={(url) => setImageUrl(url ?? "")}
+        />
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="prod-linea" className="brand-serif">Línea (opcional)</Label>
+          <Input id="prod-linea" placeholder="Ej. Deep, Fat, mr. muk" value={linea} onChange={(e) => setLinea(e.target.value)} />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <Label className="brand-serif">Categorías (filtros de la tienda)</Label>
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            {PRODUCT_TAGS.map((t) => (
+              <label key={t.value} className="flex items-center gap-1.5 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-4 rounded border-input accent-primary"
+                  checked={tags.includes(t.value)}
+                  onChange={() => toggleTag(t.value)}
+                />
+                {t.label}
+              </label>
+            ))}
           </div>
-          <div className="flex flex-col gap-2">
-            <Label>Categorías (filtros de la tienda)</Label>
-            <div className="flex flex-wrap gap-x-4 gap-y-2">
-              {PRODUCT_TAGS.map((t) => (
-                <label key={t.value} className="flex items-center gap-1.5 text-sm">
-                  <input
-                    type="checkbox"
-                    className="size-4 rounded border-input accent-primary"
-                    checked={tags.includes(t.value)}
-                    onChange={() => toggleTag(t.value)}
-                  />
-                  {t.label}
-                </label>
-              ))}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Switch id="prod-active" checked={active} onCheckedChange={setActive} />
-            <Label htmlFor="prod-active">Activo (visible en el sitio)</Label>
-          </div>
-          <DialogFooter>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? "Guardando…" : "Guardar"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        </div>
+
+        <label className="flex items-center gap-2.5 border border-border px-3 py-2.5">
+          <Switch id="prod-active" checked={active} onCheckedChange={setActive} />
+          <span className="brand-serif text-[13px]">Activo (visible en el sitio)</span>
+        </label>
+      </form>
+    </ModalFicha>
   )
 }
 
@@ -261,6 +308,7 @@ export default function Productos() {
                 <TableHead className="w-16"></TableHead>
                 <TableHead>Producto</TableHead>
                 <TableHead>Precio</TableHead>
+                <TableHead>Stock</TableHead>
                 <TableHead>Activo</TableHead>
                 <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
@@ -289,7 +337,10 @@ export default function Productos() {
                       {[p.linea, p.description].filter(Boolean).join(" — ")}
                     </div>
                   </TableCell>
-                  <TableCell className="text-sm">S/ {p.price}</TableCell>
+                  <TableCell className="tnum text-sm">S/ {p.price}</TableCell>
+                  <TableCell>
+                    <EstadoStock stock={p.stock} />
+                  </TableCell>
                   <TableCell>
                     <Switch checked={p.active} onCheckedChange={() => toggleActive(p)} />
                   </TableCell>

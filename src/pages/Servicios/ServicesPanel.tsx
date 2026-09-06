@@ -3,10 +3,10 @@ import { toast } from "sonner"
 import { ArrowDown, ArrowUp, Pencil, Plus } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { BOOKING_GROUPS, type Service, type ServiceCategory } from "@/lib/types"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import ServiceFormDialog from "@/pages/Servicios/ServiceFormDialog"
 
@@ -89,15 +89,13 @@ export default function ServicesPanel() {
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <Tabs value={group} onValueChange={(v) => setGroup(v as typeof group)}>
-          <TabsList>
-            {BOOKING_GROUPS.map((g) => (
-              <TabsTrigger key={g} value={g}>
-                {g}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <div className="flex flex-wrap gap-2">
+          {BOOKING_GROUPS.map((g) => (
+            <button key={g} type="button" onClick={() => setGroup(g)} className={cn("chip23", group === g && "on")}>
+              {g}
+            </button>
+          ))}
+        </div>
         <Button
           size="sm"
           disabled={!categories.length}

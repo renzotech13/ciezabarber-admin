@@ -17,7 +17,6 @@ import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table,
   TableBody,
@@ -205,27 +204,33 @@ export default function Bookings() {
         </Button>
       </div>
 
-      <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)} className="mb-3">
-        <TabsList>
-          {FILTROS.map((f) => (
-            <TabsTrigger key={f.key} value={f.key} className="gap-1.5">
-              <f.icon className="size-3.5" />
-              {f.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      <div className="mb-3 flex flex-wrap gap-2">
+        {FILTROS.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            onClick={() => setFilter(f.key)}
+            className={cn("chip23 inline-flex items-center gap-1.5", filter === f.key && "on")}
+          >
+            <f.icon className="size-3.5" />
+            {f.label}
+          </button>
+        ))}
+      </div>
 
-      <Tabs value={barberoFilter} onValueChange={(v) => setBarberoFilter(v as typeof barberoFilter)} className="mb-4">
-        <TabsList>
-          {BARBERO_FILTROS.map((f) => (
-            <TabsTrigger key={f.key} value={f.key} className="gap-1.5">
-              <f.icon className="size-3.5" />
-              {f.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
+      <div className="mb-4 flex flex-wrap gap-2">
+        {BARBERO_FILTROS.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            onClick={() => setBarberoFilter(f.key)}
+            className={cn("chip23 inline-flex items-center gap-1.5", barberoFilter === f.key && "on")}
+          >
+            <f.icon className="size-3.5" />
+            {f.label}
+          </button>
+        ))}
+      </div>
 
       <NuevaCitaDialog
         open={nuevaAbierta}

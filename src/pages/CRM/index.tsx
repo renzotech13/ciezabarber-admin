@@ -3,9 +3,9 @@ import { toast } from "sonner"
 import { Megaphone } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import type { ClienteEtiqueta, ConversacionResumen, Etiqueta } from "@/lib/types"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import ConversationList from "./ConversationList"
 import ChatThread from "./ChatThread"
 import ClientPanel from "./ClientPanel"
@@ -120,15 +120,18 @@ export default function CRM() {
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Tabs value={filtro} onValueChange={(v) => setFiltro(v as Filtro)}>
-            <TabsList>
-              {FILTROS.map((f) => (
-                <TabsTrigger key={f.key} value={f.key}>
-                  {f.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
+          <div className="flex flex-wrap gap-2">
+            {FILTROS.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setFiltro(f.key)}
+                className={cn("chip23", filtro === f.key && "on")}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
           <Input
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}

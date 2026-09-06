@@ -30,7 +30,7 @@ const etiquetaParte = (barbero: string) => (esDueno(barbero) ? `${barbero} ingre
 const COLOR_BARBERO: Record<string, string> = {
   Cieza: "#a34d14",
   Nilton: "#0b8560",
-  Bryan: "#5a55c9",
+  Brayan: "#5a55c9",
 }
 const COLOR_SIN_ASIGNAR = "#8d8e87"
 const SIN_ASIGNAR = "Sin asignar"

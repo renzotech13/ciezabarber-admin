@@ -11,7 +11,7 @@ type AuthState = {
    *  nunca al revés. */
   role: ProfileRole | null
   /**
-   * Qué silla es suya ('Cieza' | 'Nilton' | 'Bryan'), si le corresponde
+   * Qué silla es suya ('Cieza' | 'Nilton' | 'Brayan'), si le corresponde
    * alguna. El dueño es superadmin Y barbero: el rol dice qué puede hacer,
    * esto solo dice cuál es su agenda propia.
    */

@@ -267,7 +267,7 @@ export const COMPROBANTE_ESTADO_LABEL: Record<ComprobanteEstado, string> = {
 // Mismos 3 nombres que usan el bot (config/business.ts) y la web
 // (booking.js) — no hay tabla `barberos` todavía, así que tocar los tres
 // lados si se agrega o quita uno.
-export const BARBEROS = ["Cieza", "Nilton", "Bryan"] as const
+export const BARBEROS = ["Cieza", "Nilton", "Brayan"] as const
 export type Barbero = (typeof BARBEROS)[number]
 
 // Con qué pagó. "yape_plin" junta las dos billeteras a propósito: para la

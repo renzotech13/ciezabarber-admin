@@ -11,6 +11,7 @@ import {
   type Cita,
   type FichaCliente,
   type MetodoPago,
+  type Recompensa,
 } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -36,6 +37,12 @@ export default function FichaReserva({ cita }: { cita: Cita & { clientes: { nomb
   const [comprobanteUrl, setComprobanteUrl] = useState<string | null>(null)
   const [comprobanteRoto, setComprobanteRoto] = useState(false)
   const [cargando, setCargando] = useState(true)
+  // Fidelidad: cuántos cortes lleva, qué premios hay y cuáles ya usó.
+  const [cortes, setCortes] = useState(0)
+  const [recompensas, setRecompensas] = useState<Recompensa[]>([])
+  const [canjeadas, setCanjeadas] = useState<string[]>([])
+  const [saldo, setSaldo] = useState(0)
+  const [canjeando, setCanjeando] = useState<string | null>(null)
 
   const [preferencias, setPreferencias] = useState("")
   const [alergias, setAlergias] = useState("")
@@ -50,7 +57,7 @@ export default function FichaReserva({ cita }: { cita: Cita & { clientes: { nomb
     setComprobanteRoto(false)
 
     async function cargar() {
-      const [clienteRes, historialRes] = await Promise.all([
+      const [clienteRes, historialRes, cortesRes, recompensasRes, canjeadasRes, creditosRes] = await Promise.all([
         supabase
           .from("clientes")
           .select("id, nombre, telefono, email, notas, preferencias, alergias, created_at")
@@ -67,8 +74,23 @@ export default function FichaReserva({ cita }: { cita: Cita & { clientes: { nomb
           .in("estado", ["completada", "confirmada", "no_asistio"])
           .order("inicio_utc", { ascending: false })
           .limit(8),
+        // El conteo va sobre TODAS sus citas atendidas, no sobre las 8 del
+        // historial de arriba: el premio se gana con la trayectoria completa.
+        supabase
+          .from("citas")
+          .select("id", { count: "exact", head: true })
+          .eq("cliente_id", cita.cliente_id)
+          .eq("estado", "completada"),
+        supabase.from("recompensas").select("*").eq("activo", true).order("cortes_requeridos"),
+        supabase.from("recompensas_canjeadas").select("recompensa_id").eq("cliente_id", cita.cliente_id),
+        supabase.from("creditos_cliente").select("monto").eq("cliente_id", cita.cliente_id),
       ])
       if (!activo) return
+
+      setCortes(cortesRes.count ?? 0)
+      setRecompensas((recompensasRes.data as Recompensa[] | null) ?? [])
+      setCanjeadas(((canjeadasRes.data as { recompensa_id: string }[] | null) ?? []).map((c) => c.recompensa_id))
+      setSaldo(((creditosRes.data as { monto: number }[] | null) ?? []).reduce((s, c) => s + Number(c.monto), 0))
 
       const cliente = (clienteRes.data as FichaCliente | null) ?? null
       setFicha(cliente)
@@ -94,6 +116,25 @@ export default function FichaReserva({ cita }: { cita: Cita & { clientes: { nomb
       activo = false
     }
   }, [cita.id, cita.cliente_id, cita.comprobante_path, cita.atencion_notas, cita.metodo_pago])
+
+  /**
+   * Marcar un premio como entregado. Sin esto, la cuenta del cliente diría
+   * "ganaste la mascarilla" para siempre, aunque se la hayan dado hace un mes.
+   */
+  async function canjear(recompensa: Recompensa) {
+    setCanjeando(recompensa.id)
+    const { error } = await supabase.from("recompensas_canjeadas").insert({
+      cliente_id: cita.cliente_id,
+      recompensa_id: recompensa.id,
+    })
+    setCanjeando(null)
+    if (error) {
+      toast.error(error.code === "23505" ? "Ya estaba marcada como entregada." : "No se pudo registrar el canje.")
+      return
+    }
+    setCanjeadas((prev) => [...prev, recompensa.id])
+    toast.success(`${recompensa.titulo}: entregada.`)
+  }
 
   async function guardar() {
     setGuardando(true)
@@ -276,6 +317,45 @@ export default function FichaReserva({ cita }: { cita: Cita & { clientes: { nomb
             rows={2}
           />
         </div>
+
+        {(recompensas.length > 0 || saldo > 0) && (
+          <div className="space-y-2 border-t border-border pt-3">
+            <div className="brand-wide text-[10px] text-muted-foreground">
+              Fidelidad · {cortes} corte{cortes === 1 ? "" : "s"}
+              {saldo > 0 && ` · S/ ${saldo} a favor`}
+            </div>
+            {recompensas.map((r) => {
+              const ganada = cortes >= r.cortes_requeridos
+              const usada = canjeadas.includes(r.id)
+              return (
+                <div key={r.id} className="flex items-center gap-2 text-xs">
+                  <span className={cn("tnum w-6 shrink-0 text-right", !ganada && "text-muted-foreground")}>
+                    {r.cortes_requeridos}
+                  </span>
+                  <span className={cn("min-w-0 flex-1 truncate", !ganada && "text-muted-foreground")}>{r.titulo}</span>
+                  {usada ? (
+                    <span className="shrink-0 text-muted-foreground">Entregada</span>
+                  ) : ganada ? (
+                    <button
+                      onClick={() => canjear(r)}
+                      disabled={canjeando === r.id}
+                      className="chip23 shrink-0 px-2 py-1.5 text-[10px] disabled:opacity-40"
+                    >
+                      Entregar
+                    </button>
+                  ) : (
+                    <span className="shrink-0 text-muted-foreground">Le faltan {r.cortes_requeridos - cortes}</span>
+                  )}
+                </div>
+              )
+            })}
+            {saldo > 0 && (
+              <p className="text-[11px] text-muted-foreground">
+                Tiene S/ {saldo} a favor de una cita cancelada: descuéntalo cuando reserve.
+              </p>
+            )}
+          </div>
+        )}
 
         <Button size="sm" onClick={guardar} disabled={guardando}>
           {guardando ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}

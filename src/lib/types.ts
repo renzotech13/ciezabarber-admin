@@ -308,6 +308,27 @@ export type Cita = {
   metodo_pago: MetodoPago | null
 }
 
+/** Premio por llegar a cierta cantidad de cortes. Se edita en Servicios → Recompensas. */
+export type Recompensa = {
+  id: string
+  cortes_requeridos: number
+  titulo: string
+  descripcion: string | null
+  activo: boolean
+  created_at: string
+  updated_at: string
+}
+
+/** Saldo a favor: se acredita al cancelar y se descuenta al usarlo. */
+export type CreditoCliente = {
+  id: string
+  cliente_id: string
+  monto: number
+  motivo: string
+  cita_id: string | null
+  created_at: string
+}
+
 /** Ficha del cliente: lo que el barbero repasa antes de atenderlo. */
 export type FichaCliente = {
   id: string

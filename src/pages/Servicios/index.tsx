@@ -1,6 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import CategoriesPanel from "@/pages/Servicios/CategoriesPanel"
 import ServicesPanel from "@/pages/Servicios/ServicesPanel"
+import RecompensasPanel from "@/pages/Servicios/RecompensasPanel"
 
 export default function Servicios() {
   return (
@@ -16,12 +17,16 @@ export default function Servicios() {
         <TabsList className="mb-6">
           <TabsTrigger value="categorias">Categorías</TabsTrigger>
           <TabsTrigger value="servicios">Servicios</TabsTrigger>
+          <TabsTrigger value="recompensas">Recompensas</TabsTrigger>
         </TabsList>
         <TabsContent value="categorias">
           <CategoriesPanel />
         </TabsContent>
         <TabsContent value="servicios">
           <ServicesPanel />
+        </TabsContent>
+        <TabsContent value="recompensas">
+          <RecompensasPanel />
         </TabsContent>
       </Tabs>
     </div>

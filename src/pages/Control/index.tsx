@@ -143,7 +143,7 @@ export default function Control() {
       ) : pestania === "productos" ? (
         <Productos rango={periodo} metodo={metodo} />
       ) : (
-        <Caja periodo={periodo} />
+        <Caja periodo={periodo} onIrADia={(fecha) => setPeriodo(periodoDe("dia", fecha))} />
       )}
     </div>
   )

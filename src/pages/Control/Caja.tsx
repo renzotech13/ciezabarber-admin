@@ -11,7 +11,9 @@ import { Ficha, CabeceraFicha, Tile } from "./ui"
 import {
   cicloActual,
   cicloDe,
+  diaLimaDe,
   hoyLima,
+  sumarDias,
   formatoSoles,
   inicioDiaLimaUTC,
   finDiaLimaUTC,
@@ -80,7 +82,14 @@ function vacio(): PorMetodo {
  * repartido por medio de pago — sumarlo junto convertía cada cierre en un
  * falso descuadre.
  */
-export default function Caja({ periodo }: { periodo: Periodo }) {
+export default function Caja({
+  periodo,
+  onIrADia,
+}: {
+  periodo: Periodo
+  /** Saltar al arqueo de otro día (lo usa la lista de días sin cerrar). */
+  onIrADia: (fecha: string) => void
+}) {
   // El periodo "día" pide arqueo diario; el resto se arquea por mes de caja,
   // que es la unidad con la que el negocio liquida.
   const tipo: TipoCaja = periodo.tipo === "dia" ? "dia" : "ciclo"
@@ -97,6 +106,8 @@ export default function Caja({ periodo }: { periodo: Periodo }) {
   const [montoContado, setMontoContado] = useState("")
   const [nota, setNota] = useState("")
   const [guardando, setGuardando] = useState(false)
+  // Días que movieron plata y todavía no tienen su arqueo.
+  const [diasConMovimiento, setDiasConMovimiento] = useState<Map<string, number>>(new Map())
 
   const caja = useMemo(
     () => sesiones.find((s) => s.tipo === tipo && s.periodo === claveCaja) ?? null,
@@ -164,6 +175,42 @@ export default function Caja({ periodo }: { periodo: Periodo }) {
     }
   }, [ventana.desde, ventana.hasta])
 
+  /**
+   * Los últimos días que movieron plata, para poder ver de un vistazo cuáles
+   * quedaron sin arquear. Sin esta lista, un día sin cerrar solo se descubre
+   * navegando hacia atrás a ver qué falta.
+   */
+  useEffect(() => {
+    if (tipo !== "dia") return
+    let activo = true
+    async function calcular() {
+      const desde = inicioDiaLimaUTC(sumarDias(hoyLima(), -14))
+      const [citasRes, ventasRes] = await Promise.all([
+        supabase
+          .from("citas")
+          .select("inicio_utc, services!inner(price)")
+          .eq("estado", "completada")
+          .gte("inicio_utc", desde),
+        supabase.from("ventas_productos").select("vendido_at, cantidad, precio_unitario").gte("vendido_at", desde),
+      ])
+      if (!activo) return
+      const porDia = new Map<string, number>()
+      for (const c of (citasRes.data ?? []) as unknown as { inicio_utc: string; services: { price: string } }[]) {
+        const dia = diaLimaDe(c.inicio_utc)
+        porDia.set(dia, (porDia.get(dia) ?? 0) + (precioNumerico(c.services.price) ?? 0))
+      }
+      for (const v of (ventasRes.data ?? []) as { vendido_at: string; cantidad: number; precio_unitario: number }[]) {
+        const dia = diaLimaDe(v.vendido_at)
+        porDia.set(dia, (porDia.get(dia) ?? 0) + v.cantidad * v.precio_unitario)
+      }
+      setDiasConMovimiento(porDia)
+    }
+    calcular()
+    return () => {
+      activo = false
+    }
+  }, [tipo])
+
   async function abrirCaja() {
     const inicial = Number(montoInicial)
     if (montoInicial.trim() === "" || !Number.isFinite(inicial) || inicial < 0) {
@@ -190,6 +237,85 @@ export default function Caja({ periodo }: { periodo: Periodo }) {
     }
     toast.success("Caja abierta.")
     setMontoInicial("0")
+    cargar()
+  }
+
+  /**
+   * Un día que ya pasó se cierra de un tirón: fondo y efectivo contado en el
+   * mismo formulario. Obligar a "abrir" primero un día que terminó hace
+   * tres días es un trámite sin sentido — la caja de ese día ya vivió y lo
+   * único que falta es dejarla asentada.
+   */
+  async function cerrarDiaRetroactivo() {
+    const inicial = Number(montoInicial)
+    const contado = Number(montoContado)
+    if (montoInicial.trim() === "" || !Number.isFinite(inicial) || inicial < 0) {
+      return toast.error("Pon con cuánto efectivo arrancó ese día.")
+    }
+    if (montoContado.trim() === "" || !Number.isFinite(contado) || contado < 0) {
+      return toast.error("Pon cuánto efectivo quedó al cerrar.")
+    }
+    setGuardando(true)
+    const ahora = new Date().toISOString()
+    const { error } = await supabase.from("caja_sesiones").insert({
+      tipo,
+      periodo: claveCaja,
+      monto_inicial: inicial,
+      // La apertura se fecha al final del día que se está cerrando, no al
+      // instante de cargarlo: así el historial no dice que la caja del 4 se
+      // abrió el 6.
+      abierta_at: finDiaLimaUTC(claveCaja),
+      abierta_por: session?.user.id ?? null,
+      monto_contado: contado,
+      cerrada_at: ahora,
+      cerrada_por: session?.user.id ?? null,
+      nota: nota.trim() || null,
+    })
+    setGuardando(false)
+    if (error) {
+      toast.error(error.code === "23505" ? "Ese día ya tiene su caja." : "No se pudo cerrar ese día.")
+      return
+    }
+    toast.success("Día cerrado.")
+    setMontoInicial("0")
+    setMontoContado("")
+    setNota("")
+    cargar()
+  }
+
+  /**
+   * Deshace el cierre para corregirlo. Pasa antes de lo que parece: cerrar
+   * de madrugada carga el arqueo en el día siguiente, y sin poder deshacerlo
+   * ese error queda clavado en la contabilidad para siempre.
+   */
+  async function reabrirCaja() {
+    if (!caja) return
+    setGuardando(true)
+    const { error } = await supabase
+      .from("caja_sesiones")
+      .update({ monto_contado: null, cerrada_at: null, cerrada_por: null })
+      .eq("id", caja.id)
+    setGuardando(false)
+    if (error) {
+      toast.error("No se pudo reabrir la caja.")
+      return
+    }
+    toast.success("Caja reabierta: vuelve a cerrarla con los montos correctos.")
+    cargar()
+  }
+
+  /** Borra el arqueo entero — para el que se cargó en el día equivocado. */
+  async function eliminarCaja() {
+    if (!caja) return
+    if (!window.confirm("¿Borrar este arqueo? Se pierde el fondo, lo contado y la nota.")) return
+    setGuardando(true)
+    const { error } = await supabase.from("caja_sesiones").delete().eq("id", caja.id)
+    setGuardando(false)
+    if (error) {
+      toast.error("No se pudo borrar el arqueo.")
+      return
+    }
+    toast.success("Arqueo borrado.")
     cargar()
   }
 
@@ -237,6 +363,15 @@ export default function Caja({ periodo }: { periodo: Periodo }) {
   const totalProductos = Object.values(movido?.productos ?? {}).reduce((s, n) => s + n, 0)
   const esperadoEnCaja = (caja?.monto_inicial ?? 0) + porMetodo.efectivo
   const cerrada = caja?.cerrada_at != null
+
+  // Días con movimiento que no tienen arqueo cerrado. El día en curso no
+  // cuenta: todavía se está trabajando.
+  const hoy = hoyLima()
+  const cerrados = new Set(sesiones.filter((x) => x.cerrada_at != null).map((x) => x.periodo))
+  const diasSinCerrar = [...diasConMovimiento.entries()]
+    .filter(([dia, total]) => dia < hoy && total > 0 && !cerrados.has(dia))
+    .map(([dia, total]) => ({ dia, total }))
+    .sort((a, b) => b.dia.localeCompare(a.dia))
 
   return (
     <div className="space-y-5">
@@ -308,11 +443,13 @@ export default function Caja({ periodo }: { periodo: Periodo }) {
                   ? "Ese día no se abrió caja"
                   : "No se abrió caja en este mes"
             }
-            titulo={`Abrir caja · ${etiquetaCaja}`}
+            titulo={`${tipo === "dia" && !enCurso ? "Cerrar el día" : "Abrir caja"} · ${etiquetaCaja}`}
           />
           <div className="space-y-4 px-5 py-4">
             <div className="space-y-1.5">
-              <Label className="brand-serif">¿Con cuánto efectivo arranca?</Label>
+              <Label className="brand-serif">
+                {tipo === "dia" && !enCurso ? "¿Con cuánto efectivo arrancó?" : "¿Con cuánto efectivo arranca?"}
+              </Label>
               <Input
                 type="number"
                 min={0}
@@ -323,18 +460,51 @@ export default function Caja({ periodo }: { periodo: Periodo }) {
                 className="tnum h-12 max-w-48 text-[19px]"
               />
               <p className="brand-serif text-[12px] text-muted-foreground">
-                {tipo === "dia"
-                  ? "El sencillo con el que arranca el día, para poder dar vuelto."
-                  : "El sencillo con el que abre el periodo el 16, para poder dar vuelto."}
+                {tipo !== "dia"
+                  ? "El sencillo con el que abre el periodo el 16, para poder dar vuelto."
+                  : enCurso
+                    ? "El sencillo con el que arranca el día, para poder dar vuelto."
+                    : "El sencillo con el que arrancó ese día. Si no lo recuerdas, pon el de siempre."}
               </p>
             </div>
+            {/* Un día que ya pasó se cierra de una: pedirle "abrir" primero
+                a algo que terminó hace días es puro trámite. */}
+            {tipo === "dia" && !enCurso && (
+              <div className="space-y-1.5">
+                <Label className="brand-serif">¿Cuánto efectivo quedó al cerrar?</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  step="0.1"
+                  inputMode="decimal"
+                  value={montoContado}
+                  onChange={(e) => setMontoContado(e.target.value)}
+                  placeholder="0.00"
+                  className="tnum h-12 max-w-48 text-[19px]"
+                />
+                <Textarea
+                  value={nota}
+                  onChange={(e) => setNota(e.target.value)}
+                  placeholder="Nota del cierre (opcional)"
+                  rows={2}
+                  className="mt-2"
+                />
+              </div>
+            )}
+
             <button
-              onClick={abrirCaja}
+              onClick={tipo === "dia" && !enCurso ? cerrarDiaRetroactivo : abrirCaja}
               disabled={guardando}
               className="chip23 on inline-flex items-center gap-2 py-3 disabled:opacity-40"
             >
-              {guardando ? <Loader2 className="size-3.5 animate-spin" /> : <Unlock className="size-3.5" />}
-              Abrir caja
+              {guardando ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : tipo === "dia" && !enCurso ? (
+                <LockKeyhole className="size-3.5" />
+              ) : (
+                <Unlock className="size-3.5" />
+              )}
+              {tipo === "dia" && !enCurso ? "Cerrar este día" : "Abrir caja"}
             </button>
           </div>
         </Ficha>
@@ -363,6 +533,22 @@ export default function Caja({ periodo }: { periodo: Periodo }) {
           {caja.nota && (
             <p className="brand-serif border-t border-border px-5 py-3 text-[13px] text-muted-foreground">{caja.nota}</p>
           )}
+          <div className="flex flex-wrap items-center gap-2 border-t border-border px-5 py-3">
+            <button onClick={reabrirCaja} disabled={guardando} className="chip23 disabled:opacity-40">
+              Corregir cierre
+            </button>
+            <button
+              onClick={eliminarCaja}
+              disabled={guardando}
+              className="chip23 disabled:opacity-40"
+              style={{ borderColor: "var(--destructive)", color: "var(--destructive)" }}
+            >
+              Borrar arqueo
+            </button>
+            <span className="brand-serif text-[12px] text-muted-foreground">
+              Si este arqueo quedó cargado en el día equivocado, bórralo y ciérralo en el día que le toca.
+            </span>
+          </div>
         </Ficha>
       ) : (
         <Ficha>
@@ -428,6 +614,31 @@ export default function Caja({ periodo }: { periodo: Periodo }) {
               Cerrar caja
             </button>
           </div>
+        </Ficha>
+      )}
+
+      {tipo === "dia" && diasSinCerrar.length > 0 && (
+        <Ficha>
+          <CabeceraFicha
+            mini="Movieron plata y nadie los arqueó"
+            titulo={`Días sin cerrar (${diasSinCerrar.length})`}
+          />
+          <ul>
+            {diasSinCerrar.map((d) => (
+              <li
+                key={d.dia}
+                className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-5 py-2.5 last:border-b-0"
+              >
+                <div className="text-[13px]">
+                  <span className="font-medium capitalize">{etiquetaLarga(d.dia)}</span>
+                  <span className="brand-serif text-muted-foreground"> · {formatoSoles(d.total)} movidos</span>
+                </div>
+                <button onClick={() => onIrADia(d.dia)} className="chip23">
+                  Cerrar ese día
+                </button>
+              </li>
+            ))}
+          </ul>
         </Ficha>
       )}
 

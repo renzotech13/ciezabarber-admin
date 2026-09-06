@@ -30,7 +30,7 @@ function ultimoDiaDelMes(anio: number, mes: number): number {
 }
 
 /** Suma días a una fecha Lima sin pasar por husos horarios. */
-function sumarDias(fecha: string, dias: number): string {
+export function sumarDias(fecha: string, dias: number): string {
   const d = new Date(`${fecha}T12:00:00Z`)
   d.setUTCDate(d.getUTCDate() + dias)
   return d.toISOString().slice(0, 10)

@@ -148,10 +148,27 @@ export default function Comisiones({ rango, metodo }: { rango: Rango; metodo: Fi
     return { porDia, totalPorBarbero, haySinAsignar: totalPorBarbero.has(SIN_ASIGNAR), sinPrecioTotal }
   }, [citas])
 
-  // Columnas del libro: los barberos fijos + "Sin asignar" solo si aparece.
-  const columnas = useMemo(
-    () => [...BARBEROS, ...(haySinAsignar ? [SIN_ASIGNAR] : [])],
-    [haySinAsignar],
+  /**
+   * Columnas del libro: los barberos fijos, más cualquier otro nombre que
+   * aparezca de verdad en los datos.
+   *
+   * Ese "cualquier otro" no es teórico: cuando se corrigió "Bryan" por
+   * "Brayan", las citas viejas quedaron con el nombre anterior y el libro las
+   * sumaba en los totales pero no les daba columna — el trabajo de esos días
+   * simplemente no se veía. Un nombre que la app no reconoce tiene que
+   * saltar a la vista, no desaparecer.
+   */
+  const columnas = useMemo(() => {
+    const conocidas = new Set<string>([...BARBEROS, SIN_ASIGNAR])
+    const extra = [...totalPorBarbero.keys()].filter((b) => !conocidas.has(b)).sort()
+    return [...BARBEROS, ...extra, ...(haySinAsignar ? [SIN_ASIGNAR] : [])]
+  }, [totalPorBarbero, haySinAsignar])
+
+  // Nombres que no están en la lista oficial: casi siempre datos viejos que
+  // quedaron sin migrar tras un cambio de nombre.
+  const desconocidos = useMemo(
+    () => columnas.filter((b) => b !== SIN_ASIGNAR && !(BARBEROS as readonly string[]).includes(b)),
+    [columnas],
   )
   const colorDe = (b: string) => COLOR_BARBERO[b] ?? COLOR_SIN_ASIGNAR
 
@@ -234,6 +251,14 @@ export default function Comisiones({ rango, metodo }: { rango: Rango; metodo: Fi
   return (
     <div className="space-y-5">
       <RegistrarServicioDialog open={registrando} onOpenChange={setRegistrando} onRegistrado={cargar} />
+
+      {desconocidos.length > 0 && (
+        <p className="brand-serif border border-dashed border-[var(--status-pending)] px-4 py-2.5 text-[13px]">
+          Hay citas guardadas a nombre de <span className="font-semibold">{desconocidos.join(", ")}</span>, que ya no es
+          uno de los barberos de la lista. Salen en su propia columna para que no se pierdan, pero conviene corregir
+          esos registros en la base.
+        </p>
+      )}
 
       {metodo !== "all" && (
         <p className="brand-serif border border-dashed border-border px-4 py-2.5 text-[13px] text-muted-foreground">

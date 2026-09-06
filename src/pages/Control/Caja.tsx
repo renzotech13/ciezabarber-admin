@@ -11,16 +11,21 @@ import { Ficha, CabeceraFicha, Tile } from "./ui"
 import {
   cicloActual,
   cicloDe,
+  hoyLima,
   formatoSoles,
   inicioDiaLimaUTC,
   finDiaLimaUTC,
   etiquetaLarga,
-  type Ciclo,
+  type Periodo,
 } from "./rango"
+
+type TipoCaja = "dia" | "ciclo"
 
 type Sesion = {
   id: string
-  ciclo: string
+  tipo: TipoCaja
+  /** Día en que abre el periodo: el 16 en el mes de caja, el día mismo en la diaria. */
+  periodo: string
   monto_inicial: number
   abierta_at: string
   monto_contado: number | null
@@ -58,17 +63,31 @@ function vacio(): PorMetodo {
 }
 
 /**
- * Arqueo del mes de caja: abre el 16 con el fondo y cierra el 15 contando lo
- * que hay. Los totales salen de la ventana completa del ciclo (no de la hora
- * en que alguien apretó "abrir"), así que registrar el fondo un día tarde no
- * deja el periodo cojo.
+ * Arqueo de caja, en dos escalas según el periodo que se esté mirando arriba:
  *
- * En el cajón solo tiene que estar el fondo más lo cobrado EN EFECTIVO: lo de
- * Yape/Plin y lo del POS entró por otro lado. Por eso todo se muestra
+ *   - "Día": el arqueo operativo, el de contar el cajón antes de cerrar el
+ *     local. Abre con el fondo de ese día y cuenta lo movido ese día.
+ *   - Cualquier otro periodo: el mes de caja (16 → 15), que es el arqueo de
+ *     liquidación del ciclo completo.
+ *
+ * Son dos lecturas del mismo dinero y conviven a propósito: cerrar el día no
+ * cierra el mes ni al revés.
+ *
+ * Los totales salen de la ventana del periodo (no de la hora en que alguien
+ * apretó "abrir"), así que registrar el fondo un rato tarde no lo deja cojo.
+ * Y en el cajón solo tiene que estar el fondo más lo cobrado EN EFECTIVO: lo
+ * de Yape/Plin y lo del POS entró por otro lado, así que todo se muestra
  * repartido por medio de pago — sumarlo junto convertía cada cierre en un
  * falso descuadre.
  */
-export default function Caja({ ciclo }: { ciclo: Ciclo }) {
+export default function Caja({ periodo }: { periodo: Periodo }) {
+  // El periodo "día" pide arqueo diario; el resto se arquea por mes de caja,
+  // que es la unidad con la que el negocio liquida.
+  const tipo: TipoCaja = periodo.tipo === "dia" ? "dia" : "ciclo"
+  const ciclo = cicloDe(periodo.desde)
+  const ventana = tipo === "dia" ? { desde: periodo.desde, hasta: periodo.desde } : ciclo
+  const claveCaja = tipo === "dia" ? periodo.desde : ciclo.clave
+  const etiquetaCaja = tipo === "dia" ? etiquetaLarga(periodo.desde) : ciclo.etiqueta
   const { session } = useAuth()
   const [sesiones, setSesiones] = useState<Sesion[]>([])
   const [cargando, setCargando] = useState(true)
@@ -79,18 +98,21 @@ export default function Caja({ ciclo }: { ciclo: Ciclo }) {
   const [nota, setNota] = useState("")
   const [guardando, setGuardando] = useState(false)
 
-  const caja = useMemo(() => sesiones.find((s) => s.ciclo === ciclo.clave) ?? null, [sesiones, ciclo.clave])
-  const esCicloActual = ciclo.clave === cicloActual().clave
-  // El cierre toca el 15; antes de eso se puede cerrar igual (el dueño manda),
-  // pero el aviso deja claro que el periodo sigue corriendo.
-  const cierraHoyOAntes = !esCicloActual
+  const caja = useMemo(
+    () => sesiones.find((s) => s.tipo === tipo && s.periodo === claveCaja) ?? null,
+    [sesiones, tipo, claveCaja],
+  )
+  // "En curso" = el día de hoy, o el mes de caja que corre. Antes de que
+  // termine se puede cerrar igual (el dueño manda), pero conviene decirlo.
+  const enCurso = tipo === "dia" ? periodo.desde === hoyLima() : ciclo.clave === cicloActual().clave
 
   const cargar = useCallback(async () => {
     const { data, error } = await supabase
       .from("caja_sesiones")
       .select("*")
-      .order("ciclo", { ascending: false })
-      .limit(24)
+      .eq("tipo", tipo)
+      .order("periodo", { ascending: false })
+      .limit(30)
     if (error) {
       toast.error("No se pudo cargar la caja.")
       setSesiones([])
@@ -98,7 +120,7 @@ export default function Caja({ ciclo }: { ciclo: Ciclo }) {
       setSesiones((data as Sesion[] | null) ?? [])
     }
     setCargando(false)
-  }, [])
+  }, [tipo])
 
   useEffect(() => {
     cargar()
@@ -108,8 +130,8 @@ export default function Caja({ ciclo }: { ciclo: Ciclo }) {
   useEffect(() => {
     let activo = true
     async function calcular() {
-      const desde = inicioDiaLimaUTC(ciclo.desde)
-      const hasta = finDiaLimaUTC(ciclo.hasta)
+      const desde = inicioDiaLimaUTC(ventana.desde)
+      const hasta = finDiaLimaUTC(ventana.hasta)
       const [citasRes, ventasRes] = await Promise.all([
         supabase
           .from("citas")
@@ -140,7 +162,7 @@ export default function Caja({ ciclo }: { ciclo: Ciclo }) {
     return () => {
       activo = false
     }
-  }, [ciclo.desde, ciclo.hasta])
+  }, [ventana.desde, ventana.hasta])
 
   async function abrirCaja() {
     const inicial = Number(montoInicial)
@@ -149,14 +171,21 @@ export default function Caja({ ciclo }: { ciclo: Ciclo }) {
     }
     setGuardando(true)
     const { error } = await supabase.from("caja_sesiones").insert({
-      ciclo: ciclo.clave,
+      tipo,
+      periodo: claveCaja,
       monto_inicial: inicial,
       abierta_por: session?.user.id ?? null,
     })
     setGuardando(false)
     if (error) {
       // El índice único por ciclo es la garantía real de que no haya dos.
-      toast.error(error.code === "23505" ? "Ese mes de caja ya está abierto." : "No se pudo abrir la caja.")
+      toast.error(
+        error.code === "23505"
+          ? tipo === "dia"
+            ? "Ese día ya tiene su caja abierta."
+            : "Ese mes de caja ya está abierto."
+          : "No se pudo abrir la caja.",
+      )
       return
     }
     toast.success("Caja abierta.")
@@ -211,9 +240,25 @@ export default function Caja({ ciclo }: { ciclo: Ciclo }) {
 
   return (
     <div className="space-y-5">
+      {/* El selector de arriba decide qué caja es esta. Sin decirlo, mirar
+          "setiembre" y ver un arqueo del 16 al 15 desconcierta. */}
+      <p className="brand-serif border border-dashed border-border px-4 py-2.5 text-[13px] text-muted-foreground">
+        {tipo === "dia" ? (
+          <>
+            Arqueo del <span className="text-foreground">{etiquetaCaja}</span>: lo que hay que contar en el cajón al
+            cerrar el local. Con las flechas de arriba te mueves de día.
+          </>
+        ) : (
+          <>
+            Arqueo del mes de caja <span className="text-foreground">{etiquetaCaja}</span>, el del cierre del periodo.
+            Para cerrar el cajón de un día suelto, elige <span className="text-foreground">Día</span> arriba.
+          </>
+        )}
+      </p>
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Tile
-          etiqueta="Fondo de caja"
+          etiqueta={tipo === "dia" ? "Fondo del día" : "Fondo de caja"}
           valor={caja ? formatoSoles(caja.monto_inicial) : "—"}
           detalle={caja ? `abierta ${fechaHora(caja.abierta_at)}` : "sin abrir"}
         />
@@ -228,7 +273,11 @@ export default function Caja({ ciclo }: { ciclo: Ciclo }) {
 
       <Ficha>
         <CabeceraFicha
-          mini={`${formatoSoles(totalMovido)} movidos entre el ${etiquetaLarga(ciclo.desde)} y el ${etiquetaLarga(ciclo.hasta)}`}
+          mini={
+            tipo === "dia"
+              ? `${formatoSoles(totalMovido)} movidos el ${etiquetaLarga(ventana.desde)}`
+              : `${formatoSoles(totalMovido)} movidos entre el ${etiquetaLarga(ventana.desde)} y el ${etiquetaLarga(ventana.hasta)}`
+          }
           titulo="Cómo pagaron"
         />
         <div className="grid gap-px bg-border sm:grid-cols-3">
@@ -250,8 +299,16 @@ export default function Caja({ ciclo }: { ciclo: Ciclo }) {
       {!caja ? (
         <Ficha>
           <CabeceraFicha
-            mini={esCicloActual ? "Este mes de caja todavía no se abre" : "No se abrió caja en este mes"}
-            titulo={`Abrir caja · ${ciclo.etiqueta}`}
+            mini={
+              enCurso
+                ? tipo === "dia"
+                  ? "Hoy todavía no se abre caja"
+                  : "Este mes de caja todavía no se abre"
+                : tipo === "dia"
+                  ? "Ese día no se abrió caja"
+                  : "No se abrió caja en este mes"
+            }
+            titulo={`Abrir caja · ${etiquetaCaja}`}
           />
           <div className="space-y-4 px-5 py-4">
             <div className="space-y-1.5">
@@ -266,7 +323,9 @@ export default function Caja({ ciclo }: { ciclo: Ciclo }) {
                 className="tnum h-12 max-w-48 text-[19px]"
               />
               <p className="brand-serif text-[12px] text-muted-foreground">
-                El sencillo con el que abre el periodo el 16, para poder dar vuelto.
+                {tipo === "dia"
+                  ? "El sencillo con el que arranca el día, para poder dar vuelto."
+                  : "El sencillo con el que abre el periodo el 16, para poder dar vuelto."}
               </p>
             </div>
             <button
@@ -281,7 +340,10 @@ export default function Caja({ ciclo }: { ciclo: Ciclo }) {
         </Ficha>
       ) : cerrada ? (
         <Ficha>
-          <CabeceraFicha mini={`Cerrada el ${fechaHora(caja.cerrada_at!)}`} titulo="Cierre del periodo" />
+          <CabeceraFicha
+            mini={`Cerrada el ${fechaHora(caja.cerrada_at!)}`}
+            titulo={tipo === "dia" ? `Cierre del ${etiquetaCaja}` : "Cierre del periodo"}
+          />
           <div className="grid gap-px bg-border sm:grid-cols-3">
             <div className="bg-card px-5 py-4">
               <div className="brand-wide tnum text-[22px] leading-none">{formatoSoles(caja.monto_contado ?? 0)}</div>
@@ -305,8 +367,16 @@ export default function Caja({ ciclo }: { ciclo: Ciclo }) {
       ) : (
         <Ficha>
           <CabeceraFicha
-            mini={cierraHoyOAntes ? "El periodo ya terminó" : `Cierra el ${etiquetaLarga(ciclo.hasta)}`}
-            titulo={`Cerrar caja · ${ciclo.etiqueta}`}
+            mini={
+              !enCurso
+                ? tipo === "dia"
+                  ? "Ese día ya pasó"
+                  : "El periodo ya terminó"
+                : tipo === "dia"
+                  ? "Cuenta el cajón antes de bajar la cortina"
+                  : `Cierra el ${etiquetaLarga(ciclo.hasta)}`
+            }
+            titulo={`Cerrar caja · ${etiquetaCaja}`}
           />
           <div className="space-y-4 px-5 py-4">
             <div className="space-y-1.5">
@@ -333,7 +403,7 @@ export default function Caja({ ciclo }: { ciclo: Ciclo }) {
                     <span className="tnum font-semibold text-foreground">
                       {formatoSoles(Math.abs(esperadoEnCaja - Number(montoContado)))}
                     </span>{" "}
-                    contra el fondo más el efectivo del periodo. Déjalo anotado abajo.
+                    contra el fondo más el efectivo {tipo === "dia" ? "del día" : "del periodo"}. Déjalo anotado abajo.
                   </>
                 )}
               </p>
@@ -362,7 +432,10 @@ export default function Caja({ ciclo }: { ciclo: Ciclo }) {
       )}
 
       <Ficha>
-        <CabeceraFicha mini="Un mes de caja por fila (16 → 15)" titulo="Historial" />
+        <CabeceraFicha
+          mini={tipo === "dia" ? "Un día por fila" : "Un mes de caja por fila (16 → 15)"}
+          titulo="Historial"
+        />
         {sesiones.length === 0 ? (
           <p className="brand-serif px-5 py-8 text-center text-sm text-muted-foreground">
             Todavía no hay cajas registradas.
@@ -372,7 +445,9 @@ export default function Caja({ ciclo }: { ciclo: Ciclo }) {
             <table className="w-full text-[13px]">
               <thead>
                 <tr className="border-b border-border text-left">
-                  <th className="brand-serif px-4 py-2.5 font-normal text-muted-foreground">Mes de caja</th>
+                  <th className="brand-serif px-4 py-2.5 font-normal text-muted-foreground">
+                    {tipo === "dia" ? "Día" : "Mes de caja"}
+                  </th>
                   <th className="brand-wide px-3 py-2.5 text-right text-[10px]">Fondo</th>
                   <th className="brand-wide px-3 py-2.5 text-right text-[10px]">Contado</th>
                   <th className="brand-serif px-4 py-2.5 font-normal text-muted-foreground">Nota</th>
@@ -383,13 +458,13 @@ export default function Caja({ ciclo }: { ciclo: Ciclo }) {
                   <tr
                     key={s.id}
                     className={
-                      s.ciclo === ciclo.clave
+                      s.periodo === claveCaja
                         ? "border-b border-border/60 bg-muted/40 last:border-b-0"
                         : "border-b border-border/60 last:border-b-0"
                     }
                   >
                     <td className="whitespace-nowrap px-4 py-2">
-                      {cicloDe(s.ciclo).etiqueta}
+                      {s.tipo === "dia" ? etiquetaLarga(s.periodo) : cicloDe(s.periodo).etiqueta}
                       {s.cerrada_at == null && <span className="text-muted-foreground"> · abierta</span>}
                     </td>
                     <td className="tnum px-3 py-2 text-right">{formatoSoles(s.monto_inicial)}</td>

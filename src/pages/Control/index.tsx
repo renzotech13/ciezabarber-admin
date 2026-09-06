@@ -6,7 +6,6 @@ import Productos from "./Productos"
 import Caja from "./Caja"
 import {
   TIPOS_PERIODO,
-  cicloDe,
   periodoDe,
   esPeriodoActual,
   etiquetaLarga,
@@ -31,8 +30,8 @@ export type FiltroMetodo = MetodoPago | "all"
  * así que comisiones y ventas hablan siempre del mismo tramo. Las flechas
  * mueven ese mismo periodo hacia atrás y adelante.
  *
- * La caja es la excepción: se arquea siempre por mes de caja, así que toma
- * el ciclo en el que cae el periodo elegido.
+ * La caja lee el mismo periodo: en "Día" hace el arqueo diario (contar el
+ * cajón al cerrar el local) y en cualquier otro, el del mes de caja completo.
  */
 export default function Control() {
   const [pestania, setPestania] = useState<Pestania>("comisiones")
@@ -43,7 +42,6 @@ export default function Control() {
   const [metodo, setMetodo] = useState<FiltroMetodo>("all")
 
   const esActual = esPeriodoActual(periodo)
-  const ciclo = cicloDe(periodo.desde)
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-8">
@@ -145,7 +143,7 @@ export default function Control() {
       ) : pestania === "productos" ? (
         <Productos rango={periodo} metodo={metodo} />
       ) : (
-        <Caja ciclo={ciclo} />
+        <Caja periodo={periodo} />
       )}
     </div>
   )

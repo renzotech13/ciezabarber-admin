@@ -3,7 +3,6 @@ import { NavLink } from "react-router-dom"
 import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 import { NuevaReservaWatcher } from "@/components/NuevaReservaWatcher"
-import { AvisoBotMudo } from "@/components/AvisoBotMudo"
 
 const NAV_ITEMS = [
   { to: "/reservas", label: "Reservas" },
@@ -88,12 +87,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
           </button>
         </div>
       </aside>
-      <main className="min-w-0 flex-1 overflow-auto">
-        {/* Arriba de todo y en cualquier página: que el bot esté sordo es más
-            urgente que lo que sea que se haya venido a hacer al panel. */}
-        <AvisoBotMudo />
-        {children}
-      </main>
+      <main className="min-w-0 flex-1 overflow-auto">{children}</main>
     </div>
   )
 }

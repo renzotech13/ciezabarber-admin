@@ -5,9 +5,12 @@ import { supabase } from "@/lib/supabase"
 import { getDisponibilidad, crearCitaManual, BotApiError } from "@/lib/botApi"
 import { BARBEROS, type Barbero } from "@/lib/types"
 import { ModalFicha } from "@/components/ModalFicha"
+import { ClienteCombobox } from "@/components/ClienteCombobox"
+import { ProgresoCliente } from "@/components/ProgresoCliente"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
+import { normalizarTelefono } from "@/lib/clienteBusqueda"
 
 const TZ = "America/Lima"
 
@@ -29,12 +32,6 @@ function etiquetaDia(fecha: string): string {
   if (fecha === hoy) return "Hoy"
   const d = new Date(`${fecha}T12:00:00Z`)
   return d.toLocaleDateString("es-PE", { timeZone: "UTC", weekday: "short", day: "numeric", month: "short" })
-}
-
-/** "987654321" → "51987654321", igual que la reserva de la web. */
-function normalizarTelefono(raw: string): string {
-  const digitos = raw.replace(/\D/g, "")
-  return digitos.startsWith("51") ? digitos : `51${digitos}`
 }
 
 /**
@@ -160,9 +157,10 @@ export default function NuevaCitaDialog({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label className="brand-serif">Cliente</Label>
-            <Input
+            <ClienteCombobox
               value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
+              onChange={setNombre}
+              onSeleccionar={(c) => setTelefono(c.telefono)}
               placeholder="Nombre y apellido"
               className="h-11 rounded-none"
             />
@@ -178,6 +176,7 @@ export default function NuevaCitaDialog({
             />
           </div>
         </div>
+        <ProgresoCliente telefono={telefono} />
 
         <div className="space-y-2">
           <Label className="brand-serif">Barbero</Label>

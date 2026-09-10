@@ -8,6 +8,9 @@ import { BARBEROS, type Barbero } from "@/lib/types"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
+import { normalizarTelefono } from "@/lib/clienteBusqueda"
+import { ClienteCombobox } from "@/components/ClienteCombobox"
+import { ProgresoCliente } from "@/components/ProgresoCliente"
 
 const TZ = "America/Lima"
 
@@ -31,12 +34,6 @@ function etiquetaDia(fecha: string) {
     num: String(d.getUTCDate()),
     mes: d.toLocaleDateString("es-PE", { timeZone: "UTC", month: "short" }),
   }
-}
-
-/** "987654321" → "51987654321" (mismo criterio que la reserva de la web). */
-function normalizarTelefono(raw: string): string {
-  const digitos = raw.replace(/\D/g, "")
-  return digitos.startsWith("51") ? digitos : `51${digitos}`
 }
 
 /**
@@ -167,7 +164,13 @@ export default function NuevaCita({ onCerrar, onCreada }: { onCerrar: () => void
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="brand-serif">Cliente</Label>
-            <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre" className="h-12" />
+            <ClienteCombobox
+              value={nombre}
+              onChange={setNombre}
+              onSeleccionar={(c) => setTelefono(c.telefono)}
+              placeholder="Nombre"
+              className="h-12"
+            />
           </div>
           <div className="space-y-1.5">
             <Label className="brand-serif">WhatsApp</Label>
@@ -180,6 +183,7 @@ export default function NuevaCita({ onCerrar, onCreada }: { onCerrar: () => void
             />
           </div>
         </div>
+        <ProgresoCliente telefono={telefono} />
 
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4">
           {proximosDias().map((d) => {

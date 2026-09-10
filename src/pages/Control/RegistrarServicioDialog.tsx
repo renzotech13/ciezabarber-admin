@@ -5,9 +5,12 @@ import { supabase } from "@/lib/supabase"
 import { registrarServicioAtendido, BotApiError } from "@/lib/botApi"
 import { BARBEROS, METODOS_PAGO, METODO_PAGO_LABEL, type Barbero, type MetodoPago } from "@/lib/types"
 import { ModalFicha } from "@/components/ModalFicha"
+import { ClienteCombobox } from "@/components/ClienteCombobox"
+import { ProgresoCliente } from "@/components/ProgresoCliente"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
+import { normalizarTelefono } from "@/lib/clienteBusqueda"
 
 const TZ = "America/Lima"
 
@@ -83,7 +86,9 @@ export default function RegistrarServicioDialog({
         hora,
         ...(nombre.trim() ? { nombre_cliente: nombre.trim() } : {}),
         // Sin teléfono se le carga al cliente de mostrador (lo resuelve el bot).
-        ...(telefono.replace(/\D/g, "") ? { telefono_cliente: telefono.replace(/\D/g, "") } : {}),
+        // Normalizado con el prefijo 51: sin esto, un walk-in y una reserva
+        // web del mismo número terminaban en dos fichas de cliente distintas.
+        ...(telefono.replace(/\D/g, "") ? { telefono_cliente: normalizarTelefono(telefono) } : {}),
       })
       toast.success("Servicio registrado.")
       await onRegistrado()
@@ -168,7 +173,14 @@ export default function RegistrarServicioDialog({
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="brand-serif">Cliente (opcional)</Label>
-            <Input value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre" className="h-11" />
+            <ClienteCombobox
+              value={nombre}
+              onChange={setNombre}
+              onSeleccionar={(c) => {
+                setTelefono(c.telefono)
+              }}
+              className="h-11"
+            />
           </div>
           <div className="space-y-1.5">
             <Label className="brand-serif">WhatsApp (opcional)</Label>
@@ -181,6 +193,7 @@ export default function RegistrarServicioDialog({
             />
           </div>
         </div>
+        <ProgresoCliente telefono={telefono} />
         <p className="brand-serif text-[12px] text-muted-foreground">
           Sin nombre ni WhatsApp queda como cliente de mostrador: cuenta igual en comisiones y en caja, pero no le
           arma ficha.

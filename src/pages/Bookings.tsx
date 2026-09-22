@@ -36,6 +36,7 @@ import {
   CalendarX2,
   CheckCheck,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Image as ImageIcon,
   LayoutList,
@@ -71,12 +72,48 @@ const BARBERO_FILTROS: { key: "all" | Barbero; label: string; icon: LucideIcon }
   ...BARBEROS.map((b) => ({ key: b, label: b, icon: Scissors })),
 ]
 
+const TZ = "America/Lima"
+
 function formatDateTime(iso: string) {
   const fecha = new Date(iso)
   return {
     fecha: fecha.toLocaleDateString("es-PE", { weekday: "short", day: "numeric", month: "short" }),
     hora: fecha.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }),
   }
+}
+
+/** "2026-09-21": el día al que pertenece la cita en el calendario de Lima,
+ *  no en UTC — si no, todo lo de 7 p. m. en adelante cae al día siguiente. */
+function diaLima(iso: string) {
+  return new Date(iso).toLocaleDateString("en-CA", { timeZone: TZ })
+}
+function mesDe(dia: string) {
+  return dia.slice(0, 7)
+}
+function mesActual() {
+  return mesDe(new Date().toLocaleDateString("en-CA", { timeZone: TZ }))
+}
+/** Suma (o resta) meses a un "2026-09" sin pasar por Date y su aritmética
+ *  de meses desbordados. */
+function mesDesplazado(mes: string, pasos: number) {
+  const [anio, m] = mes.split("-").map(Number)
+  const total = anio! * 12 + (m! - 1) + pasos
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`
+}
+function etiquetaMes(mes: string) {
+  return new Date(`${mes}-01T12:00:00Z`).toLocaleDateString("es-PE", {
+    timeZone: "UTC",
+    month: "long",
+    year: "numeric",
+  })
+}
+function etiquetaDia(dia: string) {
+  return new Date(`${dia}T12:00:00Z`).toLocaleDateString("es-PE", {
+    timeZone: "UTC",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  })
 }
 
 // Los tokens de color existentes quedaron nombrados por el enum viejo de
@@ -119,6 +156,12 @@ export default function Bookings() {
   const [cobrandoGuardando, setCobrandoGuardando] = useState(false)
   const [filter, setFilter] = useState<"all" | CitaEstado>("all")
   const [barberoFilter, setBarberoFilter] = useState<"all" | Barbero>("all")
+  // La lista arranca en el mes en curso: con todo el historial junto había
+  // que bajar hasta el final para llegar a lo de esta semana.
+  const [mes, setMes] = useState(mesActual)
+  // null = nadie tocó los días todavía, así que manda el día por defecto
+  // (hoy, o el más reciente del mes). Al primer clic se materializa.
+  const [diasAbiertos, setDiasAbiertos] = useState<Set<string> | null>(null)
 
   // Fuera del efecto para poder refrescar también al crear una cita a mano.
   const load = useCallback(async () => {
@@ -128,7 +171,8 @@ export default function Bookings() {
       const { data, error } = await supabase
         .from("citas")
         .select("*, clientes!inner(nombre, telefono), services!inner(name)")
-        .order("inicio_utc", { ascending: true })
+        // Lo último arriba: la cita de mañana importa más que la de agosto.
+        .order("inicio_utc", { ascending: false })
       if (error) {
         toast.error("No se pudieron cargar las reservas.")
       } else {
@@ -180,28 +224,84 @@ export default function Bookings() {
   const filtered = useMemo(
     () =>
       citas
+        .filter((c) => mesDe(diaLima(c.inicio_utc)) === mes)
         .filter((c) => filter === "all" || c.estado === filter)
         .filter((c) => barberoFilter === "all" || c.barbero === barberoFilter),
-    [citas, filter, barberoFilter],
+    [citas, mes, filter, barberoFilter],
   )
 
-  const confirmadasCount = citas.filter((c) => c.estado === "confirmada").length
+  /** Las citas del mes partidas en días, del más reciente al más antiguo.
+   *  Dentro de cada día se leen en orden de agenda (de la mañana a la
+   *  noche), que es como se trabaja la jornada. */
+  const porDia = useMemo(() => {
+    const mapa = new Map<string, CitaConDetalle[]>()
+    for (const c of filtered) {
+      const dia = diaLima(c.inicio_utc)
+      const grupo = mapa.get(dia)
+      if (grupo) grupo.push(c)
+      else mapa.set(dia, [c])
+    }
+    return [...mapa.entries()]
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([dia, lista]) => ({
+        dia,
+        citas: [...lista].sort((x, y) => x.inicio_utc.localeCompare(y.inicio_utc)),
+      }))
+  }, [filtered])
+
+  const hoy = new Date().toLocaleDateString("en-CA", { timeZone: TZ })
+  const diaPorDefecto = porDia.some((g) => g.dia === hoy) ? hoy : porDia[0]?.dia
+  const abiertos = diasAbiertos ?? new Set(diaPorDefecto ? [diaPorDefecto] : [])
+
+  function toggleDia(dia: string) {
+    const siguiente = new Set(abiertos)
+    if (siguiente.has(dia)) siguiente.delete(dia)
+    else siguiente.add(dia)
+    setDiasAbiertos(siguiente)
+  }
+
+  // Cambiar de mes o de filtro deja los días como recién llegado: lo que
+  // estaba desplegado antes ya no existe en la lista nueva.
+  useEffect(() => {
+    setDiasAbiertos(null)
+    setAbierta(null)
+  }, [mes, filter, barberoFilter])
+
+  const confirmadasCount = filtered.filter((c) => c.estado === "confirmada").length
+  const esMesActual = mes === mesActual()
 
   return (
     <div className="mx-auto max-w-5xl px-8 py-8">
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Reservas</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground first-letter:uppercase">
             {loading
               ? "Cargando…"
-              : `${confirmadasCount} cita${confirmadasCount === 1 ? "" : "s"} confirmada${confirmadasCount === 1 ? "" : "s"}, de WhatsApp y la web.`}
+              : `${etiquetaMes(mes)} · ${filtered.length} cita${filtered.length === 1 ? "" : "s"}, ${confirmadasCount} confirmada${confirmadasCount === 1 ? "" : "s"}.`}
           </p>
         </div>
         <Button onClick={() => setNuevaAbierta(true)} className="gap-2">
           <Plus className="size-4" />
           Nueva cita
         </Button>
+      </div>
+
+      {/* En qué mes se está parado. Los meses viejos siguen a un clic: la
+          lista arranca acotada, no recortada. */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <button onClick={() => setMes(mesDesplazado(mes, -1))} aria-label="Mes anterior" className="chip23 px-2.5">
+          <ChevronLeft className="size-3.5" />
+        </button>
+        <div className="brand-wide min-w-44 text-center text-[12px] capitalize">{etiquetaMes(mes)}</div>
+        <button onClick={() => setMes(mesDesplazado(mes, 1))} aria-label="Mes siguiente" className="chip23 px-2.5">
+          <ChevronRight className="size-3.5" />
+        </button>
+        {!esMesActual && (
+          <button onClick={() => setMes(mesActual())} className="chip23">
+            Este mes
+          </button>
+        )}
       </div>
 
       <div className="mb-3 flex flex-wrap gap-2">
@@ -263,14 +363,14 @@ export default function Bookings() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="px-6 py-16 text-center text-sm text-muted-foreground">
-            No hay reservas en esta categoría todavía.
+            No hay reservas en <span className="lowercase">{etiquetaMes(mes)}</span> con estos filtros.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Fecha y hora</TableHead>
+                  <TableHead>Hora</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Servicio</TableHead>
                   <TableHead>Barbero</TableHead>
@@ -280,8 +380,39 @@ export default function Bookings() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((c) => {
-                  const { fecha, hora } = formatDateTime(c.inicio_utc)
+                {porDia.map((grupo) => {
+                  const desplegado = abiertos.has(grupo.dia)
+                  return (
+                    <Fragment key={grupo.dia}>
+                      <TableRow
+                        onClick={() => toggleDia(grupo.dia)}
+                        className="cursor-pointer border-t-2 border-border bg-muted/50 hover:bg-muted"
+                      >
+                        <TableCell colSpan={7} className="py-2.5">
+                          <div className="flex items-center gap-2">
+                            <ChevronRight
+                              className={cn(
+                                "size-4 text-muted-foreground transition-transform",
+                                desplegado && "rotate-90",
+                              )}
+                            />
+                            <span className="text-sm font-semibold first-letter:uppercase">
+                              {etiquetaDia(grupo.dia)}
+                            </span>
+                            {grupo.dia === hoy && (
+                              <Badge variant="outline" className="border-transparent bg-foreground text-[10px] text-background">
+                                Hoy
+                              </Badge>
+                            )}
+                            <span className="ml-auto text-xs text-muted-foreground">
+                              {grupo.citas.length} cita{grupo.citas.length === 1 ? "" : "s"}
+                            </span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+
+                      {desplegado && grupo.citas.map((c) => {
+                  const { hora } = formatDateTime(c.inicio_utc)
                   const expandida = abierta === c.id
                   return (
                     <Fragment key={c.id}>
@@ -289,12 +420,12 @@ export default function Bookings() {
                       onClick={() => setAbierta(expandida ? null : c.id)}
                       className="cursor-pointer"
                     >
-                      <TableCell className="whitespace-nowrap font-medium capitalize">
+                      <TableCell className="whitespace-nowrap font-medium">
                         <span className="inline-flex items-center gap-1.5">
                           <ChevronRight
                             className={cn("size-3.5 text-muted-foreground transition-transform", expandida && "rotate-90")}
                           />
-                          {fecha} · {hora}
+                          {hora}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -364,6 +495,9 @@ export default function Bookings() {
                         </TableCell>
                       </TableRow>
                     )}
+                    </Fragment>
+                  )
+                      })}
                     </Fragment>
                   )
                 })}

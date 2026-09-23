@@ -203,3 +203,17 @@ export function formatoSoles(v: number): string {
   const redondeado = Math.round(v * 100) / 100
   return `S/ ${Number.isInteger(redondeado) ? redondeado : redondeado.toFixed(2)}`
 }
+
+/**
+ * services.price es texto libre ("40", "S/ 40", "Consultar", "15–40"…). Solo
+ * un número único y claro se convierte en dinero; cualquier otro formato cae
+ * a "sin precio" — un rango "40 - 60" jamás debe volverse S/ 4060.
+ */
+const PRECIO_REGEX = /^\s*(?:s\/\.?\s*)?(\d+(?:[.,]\d{1,2})?)\s*$/i
+
+export function precioNumerico(price: string): number | null {
+  const m = PRECIO_REGEX.exec(String(price))
+  if (!m) return null
+  const n = Number(m[1]!.replace(",", "."))
+  return Number.isFinite(n) && n > 0 ? n : null
+}

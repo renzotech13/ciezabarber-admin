@@ -13,6 +13,7 @@ import {
   type MetodoPago,
 } from "@/lib/types"
 import FichaReserva from "@/components/FichaReserva"
+import { formatoSoles, precioNumerico } from "@/pages/Control/rango"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -53,7 +54,7 @@ import CobroDialog from "@/components/CobroDialog"
 /** Cita + los datos del cliente y servicio que trae el join de Supabase. */
 type CitaConDetalle = Cita & {
   clientes: { nombre: string | null; telefono: string }
-  services: { name: string }
+  services: { name: string; price: string }
 }
 
 // "expirada" no está en el menú de cambio de estado: la pone el bot al
@@ -170,7 +171,7 @@ export default function Bookings() {
       // 'bookings' aparte sin validación de horario real.
       const { data, error } = await supabase
         .from("citas")
-        .select("*, clientes!inner(nombre, telefono), services!inner(name)")
+        .select("*, clientes!inner(nombre, telefono), services!inner(name, price)")
         // Lo último arriba: la cita de mañana importa más que la de agosto.
         .order("inicio_utc", { ascending: false })
       if (error) {
@@ -440,7 +441,19 @@ export default function Bookings() {
                         </a>
                       </TableCell>
                       <TableCell className="max-w-56">
-                        <span className="text-sm">{c.services.name}</span>
+                        <span className="text-sm">
+                          {c.services.name}
+                          {/* Precio del servicio tal como está hoy en la carta: la cita no
+                              guarda el monto cobrado, así que "Consultar" o un rango se
+                              muestran tal cual en vez de convertirse en un número falso. */}
+                          <span className="text-muted-foreground">
+                            {" · "}
+                            {(() => {
+                              const n = precioNumerico(c.services.price)
+                              return n != null ? formatoSoles(n) : c.services.price
+                            })()}
+                          </span>
+                        </span>
                         {c.notas && <div className="mt-0.5 text-xs text-muted-foreground">{c.notas}</div>}
                       </TableCell>
                       <TableCell className="text-sm">

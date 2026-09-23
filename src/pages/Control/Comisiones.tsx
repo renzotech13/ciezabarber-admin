@@ -9,7 +9,7 @@ import { GraficoBarrasApiladas, GraficoBarrasH, type DiaBarras } from "./charts"
 import { Ficha, CabeceraFicha, Tile, LeyendaSerie } from "./ui"
 import {
   type Rango, listarDias, inicioDiaLimaUTC, finDiaLimaUTC, diaLimaDe,
-  etiquetaCorta, etiquetaLarga, formatoSoles,
+  etiquetaCorta, etiquetaLarga, formatoSoles, precioNumerico,
 } from "./rango"
 
 /** Regla del negocio (la misma del Excel: "BRAYAN50%, NILTON50%…"). */
@@ -48,21 +48,6 @@ type CitaFila = {
 type Celda = { servicios: number; monto: number; sinPrecio: number }
 
 const celdaVacia = (): Celda => ({ servicios: 0, monto: 0, sinPrecio: 0 })
-
-/**
- * services.price es texto libre ("40", "S/ 40", "Consultar", "15–40"…). Solo
- * un número único y claro se convierte en dinero; cualquier otro formato cae
- * a "sin precio" (cuenta el servicio, marca asterisco) — un rango "40 - 60"
- * jamás debe volverse S/ 4060 en el libro de pagos.
- */
-const PRECIO_REGEX = /^\s*(?:s\/\.?\s*)?(\d+(?:[.,]\d{1,2})?)\s*$/i
-
-function precioNumerico(price: string): number | null {
-  const m = PRECIO_REGEX.exec(String(price))
-  if (!m) return null
-  const n = Number(m[1]!.replace(",", "."))
-  return Number.isFinite(n) && n > 0 ? n : null
-}
 
 export default function Comisiones({ rango, metodo }: { rango: Rango; metodo: FiltroMetodo }) {
   const [citas, setCitas] = useState<CitaFila[]>([])

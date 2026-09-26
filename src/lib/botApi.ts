@@ -167,7 +167,8 @@ export function crearCitaManual(datos: {
  * con su medio de pago: entra directo al libro de comisiones y a la caja.
  */
 export function registrarServicioAtendido(datos: {
-  servicio_id: string
+  /** Uno o varios: se encadenan desde la hora de inicio y bloquean al barbero todo ese tiempo. */
+  servicio_ids: string[]
   barbero: Barbero
   metodo_pago: MetodoPago
   fecha: string

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-import { Check, Loader2, Phone, Plus, UserX } from "lucide-react"
+import { Check, Footprints, Loader2, Phone, Plus, UserX } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useAuth } from "@/lib/auth"
 import { actualizarEstadoCita, BotApiError } from "@/lib/botApi"
@@ -8,6 +8,7 @@ import { BARBEROS, CITA_ESTADO_LABEL, type Barbero, type CitaEstado } from "@/li
 import { cn } from "@/lib/utils"
 import DetalleCita from "./DetalleCita"
 import NuevaCita from "./NuevaCita"
+import RegistrarServicioDialog from "@/pages/Control/RegistrarServicioDialog"
 
 export type CitaAgenda = {
   id: string
@@ -77,6 +78,7 @@ export default function Agenda() {
   )
   const [detalle, setDetalle] = useState<CitaAgenda | null>(null)
   const [nuevaAbierta, setNuevaAbierta] = useState(false)
+  const [sinReservaAbierta, setSinReservaAbierta] = useState(false)
   const [accionando, setAccionando] = useState<string | null>(null)
   const version = useRef(0)
 
@@ -154,9 +156,14 @@ export default function Agenda() {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="brand-display text-[26px]">Agenda</h1>
-        <button onClick={() => setNuevaAbierta(true)} className="chip23 on inline-flex items-center gap-1.5 py-2.5">
-          <Plus className="size-3.5" /> Nueva cita
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => setSinReservaAbierta(true)} className="chip23 inline-flex items-center gap-1.5 py-2.5">
+            <Footprints className="size-3.5" /> Sin reserva
+          </button>
+          <button onClick={() => setNuevaAbierta(true)} className="chip23 on inline-flex items-center gap-1.5 py-2.5">
+            <Plus className="size-3.5" /> Nueva cita
+          </button>
+        </div>
       </div>
 
       {esDueno && (
@@ -235,6 +242,12 @@ export default function Agenda() {
       )}
 
       {detalle && <DetalleCita cita={detalle} onCerrar={() => setDetalle(null)} onCambio={cargar} />}
+      <RegistrarServicioDialog
+        open={sinReservaAbierta}
+        onOpenChange={setSinReservaAbierta}
+        onRegistrado={cargar}
+        barberoFijo={esDueno ? null : (barbero as Barbero | null)}
+      />
       {nuevaAbierta && <NuevaCita onCerrar={() => setNuevaAbierta(false)} onCreada={cargar} />}
     </div>
   )

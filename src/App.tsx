@@ -12,6 +12,7 @@ import AppShell from "@/components/AppShell"
 import AppMovilShell from "@/pages/App/Shell"
 import Agenda from "@/pages/App/Agenda"
 import Vender from "@/pages/App/Vender"
+import Chats from "@/pages/App/Chats"
 
 /**
  * Un celular (no una tablet) va directo a la app: el panel de escritorio
@@ -71,6 +72,7 @@ function Gate() {
  */
 function GateMovil() {
   const { session, loading, role, roleCargando } = useAuth()
+  const esDueno = role === "superadmin" || role === "staff"
 
   if (loading || roleCargando) return null
   if (!session) return <Login />
@@ -80,6 +82,7 @@ function GateMovil() {
       <Routes>
         <Route index element={<Agenda />} />
         <Route path="vender" element={<Vender />} />
+        <Route path="chats" element={esDueno ? <Chats /> : <Navigate to="/app" replace />} />
         <Route path="control" element={role === "superadmin" ? <Control /> : <Navigate to="/app" replace />} />
         <Route path="*" element={<Navigate to="/app" replace />} />
       </Routes>

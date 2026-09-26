@@ -21,15 +21,18 @@ export default function ConversationList({
   seleccionadaId,
   onSeleccionar,
   loading,
+  className,
 }: {
   conversaciones: ConversacionResumen[]
   etiquetasPorCliente: Map<string, Etiqueta[]>
   seleccionadaId: string | null
   onSeleccionar: (id: string) => void
   loading: boolean
+  /** Reemplaza el ancho fijo de la columna de escritorio (la app móvil la usa a pantalla completa). */
+  className?: string
 }) {
   return (
-    <aside className="flex w-72 shrink-0 flex-col border-r border-border lg:w-80">
+    <aside className={className ?? "flex w-72 shrink-0 flex-col border-r border-border lg:w-80"}>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex flex-col gap-3 p-4">

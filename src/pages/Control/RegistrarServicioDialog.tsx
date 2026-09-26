@@ -38,10 +38,13 @@ export default function RegistrarServicioDialog({
   open,
   onOpenChange,
   onRegistrado,
+  barberoFijo,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onRegistrado: () => Promise<void> | void
+  /** Un barbero solo se registra sus propios servicios (lo impone también el bot): queda fijo y sin selector. */
+  barberoFijo?: Barbero | null
 }) {
   const [servicios, setServicios] = useState<Servicio[]>([])
   const [servicioId, setServicioId] = useState("")
@@ -57,7 +60,7 @@ export default function RegistrarServicioDialog({
     if (!open) return
     const ahora = ahoraLima()
     setServicioId("")
-    setBarbero("")
+    setBarbero(barberoFijo ?? "")
     setMetodo(null)
     setFecha(ahora.fecha)
     setHora(ahora.hora)
@@ -69,7 +72,7 @@ export default function RegistrarServicioDialog({
       .eq("active", true)
       .order("sort_order")
       .then(({ data }) => setServicios((data as Servicio[] | null) ?? []))
-  }, [open])
+  }, [open, barberoFijo])
 
   async function registrar() {
     if (!servicioId) return toast.error("Elige el servicio que se hizo.")
@@ -137,16 +140,18 @@ export default function RegistrarServicioDialog({
           </select>
         </div>
 
-        <div className="space-y-2">
-          <Label className="brand-serif">¿Quién lo atendió?</Label>
-          <div className="flex flex-wrap gap-2">
-            {BARBEROS.map((b) => (
-              <button key={b} type="button" onClick={() => setBarbero(b)} className={cn("chip23", barbero === b && "on")}>
-                {b}
-              </button>
-            ))}
+        {!barberoFijo && (
+          <div className="space-y-2">
+            <Label className="brand-serif">¿Quién lo atendió?</Label>
+            <div className="flex flex-wrap gap-2">
+              {BARBEROS.map((b) => (
+                <button key={b} type="button" onClick={() => setBarbero(b)} className={cn("chip23", barbero === b && "on")}>
+                  {b}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="space-y-2">
           <Label className="brand-serif">¿Con qué pagó?</Label>

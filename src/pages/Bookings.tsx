@@ -39,6 +39,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Footprints,
   Image as ImageIcon,
   LayoutList,
   Plus,
@@ -50,6 +51,7 @@ import {
 } from "lucide-react"
 import NuevaCitaDialog from "@/components/NuevaCitaDialog"
 import CobroDialog from "@/components/CobroDialog"
+import RegistrarServicioDialog from "@/pages/Control/RegistrarServicioDialog"
 
 /** Cita + los datos del cliente y servicio que trae el join de Supabase. */
 type CitaConDetalle = Cita & {
@@ -152,6 +154,7 @@ export default function Bookings() {
   // la tabla de vista.
   const [abierta, setAbierta] = useState<string | null>(null)
   const [nuevaAbierta, setNuevaAbierta] = useState(false)
+  const [sinReservaAbierta, setSinReservaAbierta] = useState(false)
   // La cita que se está dando por atendida, mientras se elige con qué pagó.
   const [cobrando, setCobrando] = useState<CitaConDetalle | null>(null)
   const [cobrandoGuardando, setCobrandoGuardando] = useState(false)
@@ -282,10 +285,16 @@ export default function Bookings() {
               : `${etiquetaMes(mes)} · ${filtered.length} cita${filtered.length === 1 ? "" : "s"}, ${confirmadasCount} confirmada${confirmadasCount === 1 ? "" : "s"}.`}
           </p>
         </div>
-        <Button onClick={() => setNuevaAbierta(true)} className="gap-2">
-          <Plus className="size-4" />
-          Nueva cita
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setSinReservaAbierta(true)} className="gap-2">
+            <Footprints className="size-4" />
+            Registrar sin reserva
+          </Button>
+          <Button onClick={() => setNuevaAbierta(true)} className="gap-2">
+            <Plus className="size-4" />
+            Nueva cita
+          </Button>
+        </div>
       </div>
 
       {/* En qué mes se está parado. Los meses viejos siguen a un clic: la
@@ -332,6 +341,8 @@ export default function Bookings() {
           </button>
         ))}
       </div>
+
+      <RegistrarServicioDialog open={sinReservaAbierta} onOpenChange={setSinReservaAbierta} onRegistrado={load} />
 
       <NuevaCitaDialog
         open={nuevaAbierta}

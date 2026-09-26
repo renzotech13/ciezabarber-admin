@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { toast } from "sonner"
-import { AlertTriangle, Bot, ChevronDown, Paperclip, Send, UserRound } from "lucide-react"
+import { AlertTriangle, Bot, ChevronDown, ChevronLeft, Paperclip, Send, UserRound } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { enviarMensajeHumano, enviarPlantillaMensaje, BotApiError } from "@/lib/botApi"
 import type { ConversacionResumen, Mensaje, PlantillaMedia } from "@/lib/types"
@@ -76,7 +76,14 @@ function Burbuja({ mensaje }: { mensaje: Mensaje }) {
   )
 }
 
-export default function ChatThread({ conversacion }: { conversacion: ConversacionResumen | null }) {
+export default function ChatThread({
+  conversacion,
+  onVolver,
+}: {
+  conversacion: ConversacionResumen | null
+  /** Si viene, el hilo se muestra como pantalla propia (app móvil) con flecha para volver. */
+  onVolver?: () => void
+}) {
   const [mensajes, setMensajes] = useState<Mensaje[]>([])
   const [loading, setLoading] = useState(false)
   const [texto, setTexto] = useState("")
@@ -198,8 +205,13 @@ export default function ChatThread({ conversacion }: { conversacion: Conversacio
 
   return (
     <section className="flex min-w-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-5 py-3">
-        <div className="min-w-0">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-3 sm:px-5">
+        {onVolver && (
+          <button onClick={onVolver} aria-label="Volver a los chats" className="flex size-11 shrink-0 items-center justify-center">
+            <ChevronLeft className="size-5" />
+          </button>
+        )}
+        <div className="min-w-0 flex-1">
           <h2 className="truncate text-sm font-semibold">
             {conversacion.cliente_nombre?.trim() || conversacion.cliente_telefono}
           </h2>
@@ -207,9 +219,12 @@ export default function ChatThread({ conversacion }: { conversacion: Conversacio
         </div>
 
         <label className="flex shrink-0 cursor-pointer items-center gap-2 text-xs">
-          <span className={cn("font-medium", !modoHumano && "text-muted-foreground")}>Responde el bot</span>
+          <span className={cn("hidden font-medium sm:inline", !modoHumano && "text-muted-foreground")}>Responde el bot</span>
           <Switch checked={modoHumano} onCheckedChange={alternarModo} disabled={cambiandoModo} />
-          <span className={cn("font-medium", !modoHumano && "text-muted-foreground")}>Respondo yo</span>
+          <span className={cn("font-medium", !modoHumano && "text-muted-foreground")}>
+            <span className="sm:hidden">{modoHumano ? "Yo" : "Bot"}</span>
+            <span className="hidden sm:inline">Respondo yo</span>
+          </span>
         </label>
       </div>
 

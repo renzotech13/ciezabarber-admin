@@ -204,7 +204,7 @@ export default function ChatThread({
   }
 
   return (
-    <section className="flex min-w-0 flex-1 flex-col">
+    <section className="flex min-h-0 min-w-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-3 py-3 sm:px-5">
         {onVolver && (
           <button onClick={onVolver} aria-label="Volver a los chats" className="flex size-11 shrink-0 items-center justify-center">
@@ -247,7 +247,7 @@ export default function ChatThread({
         )}
       </div>
 
-      <form onSubmit={enviar} className="shrink-0 border-t border-border px-5 py-3">
+      <form onSubmit={enviar} className="shrink-0 border-t border-border px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {!modoHumano && (
           <p className="mb-2 text-xs text-muted-foreground">
             El bot está atendiendo este chat. Puedes escribir igual, pero activa <strong>Respondo yo</strong> para que

@@ -71,7 +71,7 @@ export default function Chats() {
       </div>
 
       {abierta && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-background pt-[env(safe-area-inset-top)]">
+        <div className="fixed inset-x-0 top-0 z-50 flex h-dvh flex-col overflow-hidden bg-background pt-[env(safe-area-inset-top)]">
           <ChatThread conversacion={abierta} onVolver={() => setAbiertaId(null)} />
         </div>
       )}

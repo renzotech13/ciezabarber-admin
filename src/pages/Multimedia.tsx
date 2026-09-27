@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
+import AvisoVideoPesado from "@/components/AvisoVideoPesado"
 
 const MIME_A_TIPO: Record<string, TipoMedia> = { image: "image", video: "video", audio: "audio" }
 
@@ -69,6 +70,20 @@ export default function Multimedia() {
       supabase.removeChannel(canal)
     }
   }, [])
+
+  /** Cambia el archivo elegido por su versión optimizada, también en el input, para que se vea qué se va a subir. */
+  function reemplazarArchivo(nuevo: File) {
+    setArchivo(nuevo)
+    const input = fileInputRef.current
+    if (!input) return
+    try {
+      const lista = new DataTransfer()
+      lista.items.add(nuevo)
+      input.files = lista.files
+    } catch {
+      // Sin DataTransfer el input sigue mostrando el nombre original; lo que se sube es `archivo`.
+    }
+  }
 
   async function subir(e: FormEvent) {
     e.preventDefault()
@@ -151,6 +166,7 @@ export default function Multimedia() {
             className="text-sm file:mr-3 file:rounded-md file:border file:border-border file:bg-background file:px-3 file:py-1.5 file:text-xs file:font-medium"
             required
           />
+          <AvisoVideoPesado archivo={archivo} onOptimizado={reemplazarArchivo} />
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="mm-nombre" className="text-xs">

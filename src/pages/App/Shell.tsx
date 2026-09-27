@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import { NavLink, useNavigate } from "react-router-dom"
-import { CalendarDays, LineChart, LogOut, MessageCircle, ShoppingBag } from "lucide-react"
+import { CalendarDays, Clapperboard, LineChart, LogOut, MessageCircle, ShoppingBag } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
 
@@ -20,6 +20,8 @@ export default function AppMovilShell({ children }: { children: ReactNode }) {
   const TABS = [
     { to: "/app", label: "Agenda", icon: CalendarDays, end: true },
     { to: "/app/vender", label: "Vender", icon: ShoppingBag, end: false },
+    // Sin datos de clientes ni de plata: sirve igual a barberos, recepción y dueño.
+    { to: "/app/video", label: "Video", icon: Clapperboard, end: false },
     // Las conversaciones traen datos de todos los clientes: solo dueño y recepción.
     ...(esDueno ? [{ to: "/app/chats", label: "Chats", icon: MessageCircle, end: false }] : []),
     ...(role === "superadmin" ? [{ to: "/app/control", label: "Control", icon: LineChart, end: false }] : []),

@@ -21,24 +21,73 @@ function horaCorta(iso: string) {
   return new Date(iso).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })
 }
 
+/**
+ * `media_url` guarda dos cosas distintas según quién la puso:
+ * - Una URL pública completa (empieza con "http"): lo que el bot manda
+ *   desde la biblioteca de multimedia (bucket público `plantillas-media`).
+ * - Una ruta dentro del bucket privado `comprobantes` (imágenes que llegan
+ *   DE un cliente por WhatsApp): no se puede mostrar tal cual, hay que
+ *   pedirle a Supabase una URL firmada — igual que hace FichaReserva con el
+ *   comprobante de una cita.
+ */
+function useUrlMostrable(mensaje: Mensaje) {
+  const [url, setUrl] = useState<string | null>(
+    mensaje.media_url && mensaje.media_url.startsWith("http") ? mensaje.media_url : null,
+  )
+  const [rota, setRota] = useState(false)
+
+  useEffect(() => {
+    setRota(false)
+    if (!mensaje.media_url || mensaje.media_url.startsWith("http")) {
+      setUrl(mensaje.media_url && mensaje.media_url.startsWith("http") ? mensaje.media_url : null)
+      return
+    }
+    let activo = true
+    supabase.storage
+      .from("comprobantes")
+      .createSignedUrl(mensaje.media_url, 3600)
+      .then(({ data }) => {
+        if (activo) setUrl(data?.signedUrl ?? null)
+      })
+    return () => {
+      activo = false
+    }
+  }, [mensaje.media_url])
+
+  return { url, rota, marcarRota: () => setRota(true) }
+}
+
 function MediaEnBurbuja({ mensaje }: { mensaje: Mensaje }) {
+  const { url, rota, marcarRota } = useUrlMostrable(mensaje)
   if (!mensaje.media_url) return null
+
+  if (!url) {
+    // Sin URL todavía: o se está pidiendo la firmada, o falló al pedirla.
+    return (
+      <div className="mb-1.5 flex h-32 w-48 items-center justify-center rounded-md border border-dashed border-border text-[11px] text-muted-foreground">
+        {mensaje.media_type === "image" ? "Cargando imagen…" : "Cargando archivo…"}
+      </div>
+    )
+  }
+
   if (mensaje.media_type === "image") {
-    return <img src={mensaje.media_url} alt="" className="mb-1.5 max-h-64 rounded-md object-cover" />
+    if (rota) {
+      return (
+        <div className="mb-1.5 flex h-32 w-48 items-center justify-center rounded-md border border-dashed border-border text-[11px] text-muted-foreground">
+          No se pudo cargar la imagen.
+        </div>
+      )
+    }
+    return <img src={url} alt="" onError={marcarRota} className="mb-1.5 max-h-64 rounded-md object-cover" />
   }
   if (mensaje.media_type === "video") {
-    return <video src={mensaje.media_url} controls className="mb-1.5 max-h-64 rounded-md" />
+    return <video src={url} controls className="mb-1.5 max-h-64 rounded-md" />
   }
   if (mensaje.media_type === "audio") {
-    return <audio src={mensaje.media_url} controls className="mb-1.5 w-full max-w-64" />
+    return <audio src={url} controls className="mb-1.5 w-full max-w-64" />
   }
   return (
-    <a
-      href={mensaje.media_url}
-      target="_blank"
-      rel="noreferrer"
-      className="mb-1.5 block text-xs underline underline-offset-2"
-    >
+    <a href={url} target="_blank" rel="noreferrer" className="mb-1.5 block text-xs underline underline-offset-2">
       Ver archivo
     </a>
   )

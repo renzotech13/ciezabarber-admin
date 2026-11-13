@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { toast } from "sonner"
-import { AlertTriangle, Bot, ChevronDown, ChevronLeft, Paperclip, Send, UserRound } from "lucide-react"
+import { AlertTriangle, Bot, ChevronDown, ChevronLeft, Paperclip, Send, Smartphone, UserRound } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { enviarMensajeHumano, enviarPlantillaMensaje, BotApiError } from "@/lib/botApi"
 import type { ConversacionResumen, Mensaje, PlantillaMedia } from "@/lib/types"
@@ -96,6 +96,8 @@ function MediaEnBurbuja({ mensaje }: { mensaje: Mensaje }) {
 function Burbuja({ mensaje }: { mensaje: Mensaje }) {
   const esCliente = mensaje.rol === "user"
   const esHumano = mensaje.rol === "humano"
+  // Escrito desde el celular del negocio (coexistencia), no desde este panel.
+  const desdeCelular = esHumano && mensaje.via === "whatsapp_business_app"
 
   return (
     <div className={cn("flex", esCliente ? "justify-start" : "justify-end")}>
@@ -109,7 +111,11 @@ function Burbuja({ mensaje }: { mensaje: Mensaje }) {
           )}
         >
           {!esCliente &&
-            (esHumano ? (
+            (desdeCelular ? (
+              <>
+                <Smartphone className="size-2.5" /> Equipo · celular
+              </>
+            ) : esHumano ? (
               <>
                 <UserRound className="size-2.5" /> Staff
               </>

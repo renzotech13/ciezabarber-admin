@@ -175,6 +175,8 @@ export type Mensaje = {
   wa_message_id: string | null
   media_url: string | null
   media_type: TipoMedia | null
+  /** 'whatsapp_business_app' = lo escribió el equipo desde el celular del negocio (coexistencia). Sin la migración 0031 no viene. */
+  via?: string | null
   created_at: string
 }
 

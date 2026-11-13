@@ -1,6 +1,7 @@
 import WeeklyHours from "./WeeklyHours"
 import Bloqueos from "./Bloqueos"
 import Recordatorios from "./Recordatorios"
+import OrdenLlegada from "./OrdenLlegada"
 
 export default function Disponibilidad() {
   return (
@@ -12,6 +13,7 @@ export default function Disponibilidad() {
         </p>
       </div>
 
+      <OrdenLlegada />
       <WeeklyHours />
       <Bloqueos />
       <Recordatorios />

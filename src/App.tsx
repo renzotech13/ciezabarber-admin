@@ -15,6 +15,8 @@ import Agenda from "@/pages/App/Agenda"
 import Vender from "@/pages/App/Vender"
 import Chats from "@/pages/App/Chats"
 import VideoMovil from "@/pages/App/Video"
+import Simulador from "@/pages/Simulador"
+import SimuladorMovil from "@/pages/App/Simulador"
 
 /**
  * Un celular (no una tablet) va directo a la app: el panel de escritorio
@@ -52,6 +54,7 @@ function Gate() {
         <Route path="/conversaciones" element={<CRM />} />
         <Route path="/multimedia" element={<Multimedia />} />
         <Route path="/video-hd" element={<VideoHD />} />
+        <Route path="/simulador" element={<Simulador />} />
         {/* Lo financiero es solo del dueño. Mientras el rol aún se consulta no
             se decide nada — si rebotáramos ya, un superadmin entrando con el
             enlace directo a /control acabaría siempre en Reservas. */}
@@ -86,6 +89,7 @@ function GateMovil() {
         <Route index element={<Agenda />} />
         <Route path="vender" element={<Vender />} />
         <Route path="video" element={<VideoMovil />} />
+        <Route path="simulador" element={<SimuladorMovil />} />
         <Route path="chats" element={esDueno ? <Chats /> : <Navigate to="/app" replace />} />
         <Route path="control" element={role === "superadmin" ? <Control /> : <Navigate to="/app" replace />} />
         <Route path="*" element={<Navigate to="/app" replace />} />

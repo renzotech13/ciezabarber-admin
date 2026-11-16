@@ -1,5 +1,6 @@
 import { supabase } from "./supabase"
 import type { Barbero, Cita, CitaEstado, MetodoPago, Mensaje } from "./types"
+import type { SimulacionVista } from "./simulador"
 
 const BASE_URL = import.meta.env.VITE_BOT_API_URL as string | undefined
 
@@ -183,4 +184,41 @@ export function registrarServicioAtendido(datos: {
 /** Mismo motivo que actualizarEstadoCita: si el bloqueo vino de Calendar, hay que borrar el evento también. */
 export function eliminarBloqueo(bloqueoId: string) {
   return post<Record<string, never>>(`/admin/bloqueos/${bloqueoId}/eliminar`, {})
+}
+
+/** GET autenticado contra el bot, con los mismos errores legibles que post(). */
+async function getBot<T>(path: string): Promise<T> {
+  if (!BASE_URL) throw new BotApiError(MENSAJES_ERROR.sin_configurar, "sin_configurar")
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  if (!token) throw new BotApiError(MENSAJES_ERROR.sin_sesion, "sin_sesion")
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}${path}`, { headers: { Authorization: `Bearer ${token}` } })
+  } catch {
+    throw new BotApiError(MENSAJES_ERROR.red, "red")
+  }
+  const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
+  if (!res.ok) {
+    const code = typeof json.error === "string" ? json.error : "desconocido"
+    const texto = typeof json.mensaje === "string" ? json.mensaje : (MENSAJES_ERROR[code] ?? `No se pudo completar la acción (${code}).`)
+    throw new BotApiError(texto, code)
+  }
+  return json as T
+}
+
+// --- Simulador de cortes -------------------------------------------------------
+export function analizarRostro(params: { imagen_base64: string; mime: "image/jpeg"; cliente_id?: string }) {
+  return post<{ simulacion: SimulacionVista; generacion_disponible: boolean }>("/admin/simulador/analizar", {
+    ...params,
+    consentimiento: true,
+  })
+}
+
+export function probarCorte(simulacionId: string, corteId: string) {
+  return post<{ corte_id: string; url: string | null }>(`/admin/simulador/${simulacionId}/probar`, { corte_id: corteId })
+}
+
+export function estadoSimulador() {
+  return getBot<{ generacion_disponible: boolean }>("/admin/simulador/estado")
 }

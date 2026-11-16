@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { to: "/productos", label: "Productos" },
   { to: "/multimedia", label: "Multimedia" },
   { to: "/video-hd", label: "Video HD" },
+  { to: "/simulador", label: "Simulador" },
 ]
 
 /**

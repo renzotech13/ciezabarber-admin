@@ -10,8 +10,8 @@ import { cn } from "@/lib/utils"
 
 /** Lo mismo que dice el bot si no se escribe otro texto (bot/src/db/repositories/configuracion.ts). */
 const MENSAJE_POR_DEFECTO =
-  "Por la campaña de fin de año atendemos por orden de llegada: no se separa hora. Ven directo al local " +
-  "(Jr. Manuel Gonzales Prada 875, Los Olivos), todos los días de 10:00 a. m. a 9:00 p. m., y te atendemos en el " +
+  "Por la alta demanda de fin de año estamos atendiendo por orden de llegada: no hay horarios para separar. " +
+  "Te atendemos todos los días de 10:00 a. m. a 9:00 p. m. en Jr. Manuel Gonzales Prada 875, Los Olivos, en el " +
   "orden en que llegues."
 
 /**

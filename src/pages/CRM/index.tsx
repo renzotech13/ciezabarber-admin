@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Megaphone } from "lucide-react"
+import { Megaphone, QrCode } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -7,6 +7,7 @@ import ConversationList from "./ConversationList"
 import ChatThread from "./ChatThread"
 import ClientPanel from "./ClientPanel"
 import PromoDialog from "./PromoDialog"
+import WhatsappQrDialog from "./WhatsappQrDialog"
 import { FILTROS_INBOX, useInbox } from "./useInbox"
 
 export default function CRM() {
@@ -16,6 +17,7 @@ export default function CRM() {
   } = useInbox()
   const [seleccionadaId, setSeleccionadaId] = useState<string | null>(null)
   const [promoAbierto, setPromoAbierto] = useState(false)
+  const [qrAbierto, setQrAbierto] = useState(false)
 
   // Si la seleccionada se sale del filtro, se cae a la primera visible en
   // vez de dejar el panel derecho apuntando a algo que ya no está en lista.
@@ -33,10 +35,16 @@ export default function CRM() {
                 : `${conversaciones.length} en total · ${sinResponder} sin responder · ${conHumano} atendidas por una persona`}
             </p>
           </div>
-          <Button variant="outline" onClick={() => setPromoAbierto(true)} className="gap-2">
-            <Megaphone className="size-4" />
-            Enviar promoción
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setQrAbierto(true)} className="gap-2">
+              <QrCode className="size-4" />
+              WhatsApp por QR
+            </Button>
+            <Button variant="outline" onClick={() => setPromoAbierto(true)} className="gap-2">
+              <Megaphone className="size-4" />
+              Enviar promoción
+            </Button>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -77,6 +85,7 @@ export default function CRM() {
         />
       </div>
 
+      <WhatsappQrDialog open={qrAbierto} onOpenChange={setQrAbierto} />
       <PromoDialog
         open={promoAbierto}
         onOpenChange={setPromoAbierto}

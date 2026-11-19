@@ -211,6 +211,8 @@ export type ConversacionResumen = {
   ultimo_rol: RolMensaje | null
   ultimo_mensaje_at: string
   actividad_at: string
+  /** Por qué número escribió: el oficial del bot ('api') o el vinculado por QR ('qr'). Falta antes de la 0034. */
+  canal?: "api" | "qr" | null
 }
 
 export type Etiqueta = {

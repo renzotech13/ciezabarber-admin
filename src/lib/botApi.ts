@@ -222,3 +222,23 @@ export function probarCorte(simulacionId: string, corteId: string) {
 export function estadoSimulador() {
   return getBot<{ generacion_disponible: boolean }>("/admin/simulador/estado")
 }
+
+// --- WhatsApp por QR (no oficial) ----------------------------------------------
+export type EstadoWhatsappQr = {
+  estado: "apagado" | "sin_sesion" | "esperando_qr" | "conectando" | "conectado" | "desconectado"
+  qr: string | null
+  telefono: string | null
+  error: string | null
+}
+
+export function estadoWhatsappQr() {
+  return getBot<EstadoWhatsappQr>("/admin/whatsapp-qr")
+}
+
+export function conectarWhatsappQr() {
+  return post<EstadoWhatsappQr>("/admin/whatsapp-qr/conectar", {})
+}
+
+export function desvincularWhatsappQr() {
+  return post<EstadoWhatsappQr>("/admin/whatsapp-qr/desvincular", {})
+}

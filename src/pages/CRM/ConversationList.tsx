@@ -60,8 +60,18 @@ export default function ConversationList({
                     )}
                   >
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="truncate text-sm font-medium">
-                        {c.cliente_nombre?.trim() || c.cliente_telefono}
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="truncate text-sm font-medium">
+                          {c.cliente_nombre?.trim() || c.cliente_telefono}
+                        </span>
+                        {c.canal === "qr" && (
+                          <span
+                            className="shrink-0 border border-border px-1 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground"
+                            title="Escribió al WhatsApp vinculado por QR"
+                          >
+                            QR
+                          </span>
+                        )}
                       </span>
                       <span className="shrink-0 text-xs text-muted-foreground">{tiempoRelativo(c.actividad_at)}</span>
                     </div>

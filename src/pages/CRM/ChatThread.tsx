@@ -360,10 +360,16 @@ export default function ChatThread({
           </Button>
         </div>
 
-        {abierta && (
+        {conversacion?.canal === "qr" ? (
           <p className="mt-1.5 text-[11px] text-muted-foreground">
-            Quedan ~{horasRestantesVentana(conversacion)} h de ventana para escribir libremente.
+            Escribió al WhatsApp vinculado por QR: la respuesta sale por ese número.
           </p>
+        ) : (
+          abierta && (
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+              Quedan ~{horasRestantesVentana(conversacion)} h de ventana para escribir libremente.
+            </p>
+          )
         )}
       </form>
     </section>

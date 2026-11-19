@@ -14,6 +14,8 @@ export function esperaRespuesta(c: ConversacionResumen): boolean {
  * negocio responde.
  */
 export function ventanaAbierta(c: ConversacionResumen, ahora = Date.now()): boolean {
+  // Por el WhatsApp vinculado por QR no hay ventana de 24 h (si el número no está conectado, el bot lo avisa al enviar).
+  if (c.canal === "qr") return true
   return ahora - new Date(c.ultimo_mensaje_at).getTime() < VENTANA_MS
 }
 

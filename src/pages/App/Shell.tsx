@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { AsistenteIA } from "@/components/Asistente/AsistenteIA"
 import { NavLink, useNavigate } from "react-router-dom"
 import { CalendarDays, Clapperboard, LineChart, LogOut, MessageCircle, ShoppingBag, ScanFace } from "lucide-react"
 import { useAuth } from "@/lib/auth"
@@ -77,6 +78,7 @@ export default function AppMovilShell({ children }: { children: ReactNode }) {
           </NavLink>
         ))}
       </nav>
+      <AsistenteIA movil />
     </div>
   )
 }

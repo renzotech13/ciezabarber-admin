@@ -242,3 +242,18 @@ export function conectarWhatsappQr() {
 export function desvincularWhatsappQr() {
   return post<EstadoWhatsappQr>("/admin/whatsapp-qr/desvincular", {})
 }
+
+// --- Asistente IA ---------------------------------------------------------------
+export type TurnoAsistente = { rol: "user" | "assistant"; texto: string }
+export type AccionAsistente = { nombre: string; entrada: Record<string, unknown>; resumen: string }
+export type RespuestaAsistente =
+  | { tipo: "respuesta"; texto: string }
+  | { tipo: "confirmar"; texto: string; accion: AccionAsistente }
+
+export function conversarAsistente(historial: TurnoAsistente[]) {
+  return post<RespuestaAsistente>("/admin/asistente", { historial })
+}
+
+export function ejecutarAccionAsistente(accion: AccionAsistente) {
+  return post<{ ok: true; texto: string }>("/admin/asistente/ejecutar", { nombre: accion.nombre, entrada: accion.entrada })
+}

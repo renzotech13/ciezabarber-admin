@@ -1,4 +1,5 @@
 import type { ReactNode } from "react"
+import { AsistenteIA } from "@/components/Asistente/AsistenteIA"
 import { NavLink } from "react-router-dom"
 import { useAuth } from "@/lib/auth"
 import { cn } from "@/lib/utils"
@@ -90,6 +91,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
       <main className="min-w-0 flex-1 overflow-auto">{children}</main>
+      <AsistenteIA />
     </div>
   )
 }
